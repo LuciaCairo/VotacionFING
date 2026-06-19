@@ -1,0 +1,30 @@
+# Dependencias
+node_modules/
+
+# Build
+dist/
+
+# Variables de entorno (NUNCA commitear: contienen claves privadas y el salt)
+.env
+.env.local
+.env.*.local
+
+# Keystore de BFA (clave privada cifrada)
+*.keystore
+keystore*.json
+
+# Logs
+*.log
+logs/
+
+# Prisma
+prisma/*.db
+prisma/migrations/dev.db*
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

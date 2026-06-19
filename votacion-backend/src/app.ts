@@ -1,0 +1,53 @@
+import Fastify, { type FastifyInstance } from 'fastify';
+import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
+import { env } from './config/env.js';
+import { logger } from './config/logger.js';
+
+import authPlugin from './plugins/auth.plugin.js';
+import errorHandlerPlugin from './plugins/error-handler.plugin.js';
+
+// Rutas por modulo (se iran agregando endpoint por endpoint).
+import { authRoutes } from './modules/auth/auth.routes.js';
+// import { votanteRoutes } from './modules/votante/votante.routes.js';
+import { adminRoutes } from './modules/admin/admin.routes.js';
+
+/**
+ * Construye la instancia de Fastify con todos los plugins y rutas.
+ * Separado de la escucha (server.ts) para facilitar testing.
+ */
+export async function buildApp(): Promise<FastifyInstance> {
+  const app = Fastify({
+    loggerInstance: logger,
+    trustProxy: true, // detras de NGINX
+    bodyLimit: 1 * 1024 * 1024, // 1 MB
+  });
+
+  // ─── Plugins core ──────────────────────────────────────────
+  await app.register(cors, {
+    origin: env.corsOrigins,
+    credentials: true,
+    methods: ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'OPTIONS'],
+  });
+
+  // Rate limit global suave. El bloqueo especifico de login (5 intentos)
+  // se maneja aparte con Redis dentro del modulo auth.
+  await app.register(rateLimit, {
+    max: 200,
+    timeWindow: '1 minute',
+    errorResponseBuilder: () => ({ error: 'Demasiadas solicitudes. Intentá más tarde.' }),
+  });
+
+  await app.register(errorHandlerPlugin);
+  await app.register(authPlugin);
+
+  // ─── Health check ──────────────────────────────────────────
+  app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
+
+  // ─── Rutas de la API ───────────────────────────────────────
+  await app.register(authRoutes, { prefix: '/api/auth' });
+  // await app.register(votanteRoutes, { prefix: '/api/votante' });
+  await app.register(adminRoutes, { prefix: '/api/admin' });
+
+  return app;
+}

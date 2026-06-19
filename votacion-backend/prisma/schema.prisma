@@ -1,0 +1,150 @@
+// ─────────────────────────────────────────────────────────────
+//  Esquema Prisma — Sistema de Votacion Electronica FING (UNCuyo)
+//  Fuente: B.2 BASE DE DATOS de la documentacion del sistema.
+// ─────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ───────────────────────────────────────────────────
+
+enum EstadoEleccion {
+  creada
+  publicada
+  finalizada
+}
+
+enum TipoEvento {
+  login_exitoso
+  login_fallido
+  voto_emitido
+  voto_error
+  eleccion_creada
+  eleccion_editada
+  eleccion_eliminada
+  lista_creada
+  lista_editada
+  lista_eliminada
+  cierre_automatico
+  apertura_automatica
+  verificacion_integridad
+  sesion_cerrada
+}
+
+enum RolUsuario {
+  votante
+  administrador
+  sistema
+}
+
+// ─── ADMINISTRADOR ───────────────────────────────────────────
+// Un unico registro (o pocos). Se carga directo en la BD.
+
+model Administrador {
+  id            Int    @id @default(autoincrement())
+  correo        String @unique @db.VarChar(100)
+  passwordHash  String @map("password_hash") @db.VarChar(255)
+
+  @@map("administrador")
+}
+
+// ─── ELECCION ────────────────────────────────────────────────
+
+model Eleccion {
+  id              Int            @id @default(autoincrement())
+  nombre          String         @db.VarChar(150)
+  fechaInicio     DateTime       @map("fecha_inicio")
+  fechaCierre     DateTime       @map("fecha_cierre")
+  // Nullable: se llena con la address del contrato al desplegar (durante la creacion).
+  contratoAddress String?        @map("contrato_address") @db.VarChar(42)
+  estado          EstadoEleccion @default(creada)
+  createdAt       DateTime       @default(now()) @map("created_at")
+
+  listas         Lista[]
+  participaciones Participacion[]
+
+  @@map("eleccion")
+}
+
+// ─── LISTA ───────────────────────────────────────────────────
+
+model Lista {
+  id         Int     @id @default(autoincrement())
+  idEleccion Int     @map("id_eleccion")
+  nombre     String  @db.VarChar(100)
+  esBlanco   Boolean @default(false) @map("es_blanco")
+
+  // ON DELETE CASCADE: al borrar la eleccion se borran sus listas.
+  eleccion Eleccion @relation(fields: [idEleccion], references: [id], onDelete: Cascade)
+
+  // Evita dos listas con el mismo nombre dentro de la misma eleccion.
+  @@unique([idEleccion, nombre], name: "uq_lista_eleccion_nombre")
+  @@index([idEleccion])
+  @@map("lista")
+}
+
+// ─── VOTANTE ─────────────────────────────────────────────────
+// Se carga directo en la BD. La app no registra votantes.
+
+model Votante {
+  id             Int      @id @default(autoincrement())
+  legajo         String   @unique @db.VarChar(20)
+  nombreCompleto String   @map("nombre_completo") @db.VarChar(150)
+  carrera        String   @db.VarChar(100)
+  correo         String   @db.VarChar(100)
+  passwordHash   String   @map("password_hash") @db.VarChar(255)
+  activo         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  participaciones Participacion[]
+
+  @@map("votante")
+}
+
+// ─── PARTICIPACION ───────────────────────────────────────────
+// Registra QUIEN voto en QUE eleccion y cuando. NUNCA a que lista.
+// Intencionalmente NO tiene FK hacia LISTA (preserva el anonimato).
+
+model Participacion {
+  id             Int      @id @default(autoincrement())
+  idVotante      Int      @map("id_votante")
+  idEleccion     Int      @map("id_eleccion")
+  fechaVoto      DateTime @default(now()) @map("fecha_voto")
+  // Hash bytes32 = keccak256(legajo + SALT_SECRETO). Comprobante anonimo.
+  hashBlockchain String   @map("hash_blockchain") @db.VarChar(255)
+  // Hash de la transaccion en BFA (verificable en el explorador).
+  txHash         String   @map("tx_hash") @db.VarChar(255)
+
+  // ON DELETE RESTRICT: no se puede borrar un votante o eleccion con votos.
+  votante  Votante  @relation(fields: [idVotante], references: [id], onDelete: Restrict)
+  eleccion Eleccion @relation(fields: [idEleccion], references: [id], onDelete: Restrict)
+
+  // Garantiza a nivel de BD que no haya voto duplicado por eleccion.
+  @@unique([idVotante, idEleccion], name: "uq_participacion_votante_eleccion")
+  @@index([idEleccion])
+  @@map("participacion")
+}
+
+// ─── LOG ─────────────────────────────────────────────────────
+// Eventos criticos. Nunca contiene passwords ni datos sensibles.
+
+model Log {
+  id          Int        @id @default(autoincrement())
+  tipoEvento  TipoEvento @map("tipo_evento")
+  descripcion String?    @db.Text
+  // Nullable para eventos del sistema (cron, etc).
+  idUsuario   Int?       @map("id_usuario")
+  rolUsuario  RolUsuario @map("rol_usuario")
+  timestamp   DateTime   @default(now())
+  ip          String?    @db.VarChar(45)
+
+  @@index([tipoEvento])
+  @@index([timestamp])
+  @@map("log")
+}
