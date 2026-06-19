@@ -79,12 +79,17 @@ model Lista {
   idEleccion Int     @map("id_eleccion")
   nombre     String  @db.VarChar(100)
   esBlanco   Boolean @default(false) @map("es_blanco")
+  // Posicion 0-based en el array _listas que se paso al constructor del contrato.
+  // Critico para cruzar obtenerTodosLosVotos() con los registros de BD.
+  indice     Int     @map("indice")
 
   // ON DELETE CASCADE: al borrar la eleccion se borran sus listas.
   eleccion Eleccion @relation(fields: [idEleccion], references: [id], onDelete: Cascade)
 
   // Evita dos listas con el mismo nombre dentro de la misma eleccion.
   @@unique([idEleccion, nombre], name: "uq_lista_eleccion_nombre")
+  // Evita indices duplicados dentro de la misma eleccion.
+  @@unique([idEleccion, indice], name: "uq_lista_eleccion_indice")
   @@index([idEleccion])
   @@map("lista")
 }
