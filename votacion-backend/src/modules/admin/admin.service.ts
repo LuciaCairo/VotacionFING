@@ -13,64 +13,58 @@ const VOTO_EN_BLANCO = 'Voto en blanco';
 
 // ─── DTOs de respuesta ───────────────────────────────────────
 
-interface EleccionCreadaDTO {
+interface ListaResumenDTO {
+  id: number;
+  nombre: string;
+  indice: number;
+}
+
+interface EleccionResumenDTO {
   id: number;
   nombre: string;
   fecha_inicio: string;
   fecha_cierre: string;
-  cantidad_listas: number;
-}
-
-interface EleccionPublicadaOFinalizadaDTO extends EleccionCreadaDTO {
-  votos_emitidos: number;
+  estado: string;
+  contrato_address: string | null;
+  listas: ListaResumenDTO[];
 }
 
 interface EleccionesAgrupadas {
-  creadas: EleccionCreadaDTO[];
-  publicadas: EleccionPublicadaOFinalizadaDTO[];
-  finalizadas: EleccionPublicadaOFinalizadaDTO[];
+  creada: EleccionResumenDTO[];
+  publicada: EleccionResumenDTO[];
+  finalizada: EleccionResumenDTO[];
 }
 
 // ─── GET /api/admin/elecciones ───────────────────────────────
 
 /**
  * Devuelve todas las elecciones agrupadas por estado (creada / publicada /
- * finalizada), con la cantidad de listas y, para publicadas y finalizadas,
- * la cantidad de votos emitidos.
- *
- * `votos_emitidos` se calcula contando PARTICIPACION en la BD (cuántos
- * votantes ya votaron), no consultando el contrato: es solo un conteo de
- * participación, no el detalle por lista (eso lo da /resultados, que sí
- * lee de blockchain).
+ * finalizada). Dentro de cada grupo, orden por fecha_inicio DESC (las más
+ * recientes o próximas primero). Solo lee BD — no consulta blockchain.
  */
 export async function listarEleccionesAgrupadas(): Promise<EleccionesAgrupadas> {
   const elecciones = await prisma.eleccion.findMany({
     orderBy: { fechaInicio: 'desc' },
     include: {
-      _count: {
-        select: { listas: true, participaciones: true },
+      listas: {
+        orderBy: { indice: 'asc' },
+        select: { id: true, nombre: true, indice: true },
       },
     },
   });
 
-  const agrupadas: EleccionesAgrupadas = { creadas: [], publicadas: [], finalizadas: [] };
+  const agrupadas: EleccionesAgrupadas = { creada: [], publicada: [], finalizada: [] };
 
   for (const e of elecciones) {
-    const base = {
+    agrupadas[e.estado].push({
       id: e.id,
       nombre: e.nombre,
       fecha_inicio: e.fechaInicio.toISOString(),
       fecha_cierre: e.fechaCierre.toISOString(),
-      cantidad_listas: e._count.listas,
-    };
-
-    if (e.estado === 'creada') {
-      agrupadas.creadas.push(base);
-    } else if (e.estado === 'publicada') {
-      agrupadas.publicadas.push({ ...base, votos_emitidos: e._count.participaciones });
-    } else {
-      agrupadas.finalizadas.push({ ...base, votos_emitidos: e._count.participaciones });
-    }
+      estado: e.estado,
+      contrato_address: e.contratoAddress ?? null,
+      listas: e.listas,
+    });
   }
 
   return agrupadas;
