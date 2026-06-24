@@ -111,6 +111,50 @@ export async function listarPadron(busqueda?: string) {
   };
 }
 
+// ─── GET /api/admin/padron/descargar ────────────────────────
+
+// Escapa un campo según RFC 4180: si contiene coma, comilla doble o salto
+// de línea lo envuelve en comillas dobles y duplica las comillas internas.
+function escaparCampoCSV(valor: string): string {
+  if (valor.includes(',') || valor.includes('"') || valor.includes('\n') || valor.includes('\r')) {
+    return `"${valor.replace(/"/g, '""')}"`;
+  }
+  return valor;
+}
+
+/**
+ * Genera el padrón completo como CSV RFC 4180 con BOM UTF-8.
+ * Incluye correo y activo (a diferencia de la vista de pantalla).
+ * Nunca incluye passwordHash.
+ */
+export async function descargarPadronCsv(): Promise<string> {
+  const votantes = await prisma.votante.findMany({
+    orderBy: { nombreCompleto: 'asc' },
+    select: {
+      legajo: true,
+      nombreCompleto: true,
+      carrera: true,
+      correo: true,
+      activo: true,
+    },
+  });
+
+  const encabezado = 'legajo,nombre_completo,carrera,correo,activo';
+
+  const filas = votantes.map((v) =>
+    [
+      escaparCampoCSV(v.legajo),
+      escaparCampoCSV(v.nombreCompleto),
+      escaparCampoCSV(v.carrera),
+      escaparCampoCSV(v.correo),
+      escaparCampoCSV(String(v.activo)),
+    ].join(','),
+  );
+
+  // BOM UTF-8 (﻿) para que Excel interprete correctamente los acentos.
+  return '﻿' + [encabezado, ...filas].join('\r\n');
+}
+
 // ─── DELETE /api/admin/elecciones/:id ───────────────────────
 
 /**

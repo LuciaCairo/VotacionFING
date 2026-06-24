@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { listarEleccionesAgrupadas, crearEleccion, eliminarEleccion, listarPadron } from './admin.service.js';
+import { listarEleccionesAgrupadas, crearEleccion, eliminarEleccion, listarPadron, descargarPadronCsv } from './admin.service.js';
 import { crearEleccionSchema, eleccionIdParamSchema, padronQuerySchema } from './admin.schemas.js';
 import { obtenerIp } from '../../utils/request.js';
 
@@ -11,6 +11,16 @@ import { obtenerIp } from '../../utils/request.js';
 export const adminRoutes: FastifyPluginAsync = async (app) => {
   // Guard reutilizable para todas las rutas de este módulo.
   const soloAdmin = [app.autenticar, app.requiereRol('administrador')];
+
+  // ─── GET /api/admin/padron/descargar ────────────────────────
+  app.get('/padron/descargar', { preHandler: soloAdmin }, async (_req, reply) => {
+    const csv = await descargarPadronCsv();
+    return reply
+      .code(200)
+      .header('Content-Type', 'text/csv; charset=utf-8')
+      .header('Content-Disposition', 'attachment; filename="padron.csv"')
+      .send(csv);
+  });
 
   // ─── GET /api/admin/padron ──────────────────────────────────
   app.get('/padron', { preHandler: soloAdmin }, async (req, reply) => {
