@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { listarEleccionesAgrupadas, crearEleccion, eliminarEleccion } from './admin.service.js';
-import { crearEleccionSchema, eleccionIdParamSchema } from './admin.schemas.js';
+import { listarEleccionesAgrupadas, crearEleccion, eliminarEleccion, listarPadron } from './admin.service.js';
+import { crearEleccionSchema, eleccionIdParamSchema, padronQuerySchema } from './admin.schemas.js';
 import { obtenerIp } from '../../utils/request.js';
 
 /**
@@ -11,6 +11,13 @@ import { obtenerIp } from '../../utils/request.js';
 export const adminRoutes: FastifyPluginAsync = async (app) => {
   // Guard reutilizable para todas las rutas de este módulo.
   const soloAdmin = [app.autenticar, app.requiereRol('administrador')];
+
+  // ─── GET /api/admin/padron ──────────────────────────────────
+  app.get('/padron', { preHandler: soloAdmin }, async (req, reply) => {
+    const { busqueda } = padronQuerySchema.parse(req.query);
+    const resultado = await listarPadron(busqueda);
+    return reply.code(200).send(resultado);
+  });
 
   // ─── GET /api/admin/elecciones ──────────────────────────────
   app.get('/elecciones', { preHandler: soloAdmin }, async (_req, reply) => {

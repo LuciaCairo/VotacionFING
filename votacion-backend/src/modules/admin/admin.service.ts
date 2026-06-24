@@ -70,6 +70,47 @@ export async function listarEleccionesAgrupadas(): Promise<EleccionesAgrupadas> 
   return agrupadas;
 }
 
+// ─── GET /api/admin/padron ───────────────────────────────────
+
+/**
+ * Devuelve el padrón de votantes con sus datos públicos (sin password).
+ * Si se pasa `busqueda`, filtra por coincidencia parcial case-insensitive
+ * en legajo o nombre_completo. Ordenado por nombre_completo ASC.
+ */
+export async function listarPadron(busqueda?: string) {
+  const termino = busqueda?.trim();
+
+  const where = termino
+    ? {
+        OR: [
+          { legajo: { contains: termino, mode: 'insensitive' as const } },
+          { nombreCompleto: { contains: termino, mode: 'insensitive' as const } },
+        ],
+      }
+    : {};
+
+  const votantes = await prisma.votante.findMany({
+    where,
+    orderBy: { nombreCompleto: 'asc' },
+    select: {
+      id: true,
+      legajo: true,
+      nombreCompleto: true,
+      carrera: true,
+    },
+  });
+
+  return {
+    total: votantes.length,
+    votantes: votantes.map((v) => ({
+      id: v.id,
+      legajo: v.legajo,
+      nombre_completo: v.nombreCompleto,
+      carrera: v.carrera,
+    })),
+  };
+}
+
 // ─── DELETE /api/admin/elecciones/:id ───────────────────────
 
 /**

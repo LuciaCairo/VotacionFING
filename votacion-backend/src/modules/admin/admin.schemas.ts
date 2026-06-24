@@ -29,3 +29,9 @@ export const eleccionIdParamSchema = z.object({
 });
 
 export type EleccionIdParam = z.infer<typeof eleccionIdParamSchema>;
+
+export const padronQuerySchema = z.object({
+  busqueda: z.string().trim().optional(),
+});
+
+export type PadronQuery = z.infer<typeof padronQuerySchema>;
