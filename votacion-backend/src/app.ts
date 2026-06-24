@@ -9,7 +9,7 @@ import errorHandlerPlugin from './plugins/error-handler.plugin.js';
 
 // Rutas por modulo (se iran agregando endpoint por endpoint).
 import { authRoutes } from './modules/auth/auth.routes.js';
-// import { votanteRoutes } from './modules/votante/votante.routes.js';
+import { votanteRoutes } from './modules/votante/votante.routes.js';
 import { adminRoutes } from './modules/admin/admin.routes.js';
 
 /**
@@ -46,7 +46,7 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // ─── Rutas de la API ───────────────────────────────────────
   await app.register(authRoutes, { prefix: '/api/auth' });
-  // await app.register(votanteRoutes, { prefix: '/api/votante' });
+  await app.register(votanteRoutes, { prefix: '/api/votante' });
   await app.register(adminRoutes, { prefix: '/api/admin' });
 
   return app;
