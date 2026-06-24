@@ -2,7 +2,7 @@ import { prisma } from '../../config/prisma.js';
 import { logger } from '../../config/logger.js';
 import { desplegarContrato } from '../../services/blockchain.service.js';
 import { registrarLog } from '../../services/log.service.js';
-import { ValidacionError, InternoError } from '../../utils/errors.js';
+import { ValidacionError, InternoError, NoEncontradoError, ConflictoError } from '../../utils/errors.js';
 import type { JwtPayload } from '../../types/auth.js';
 import type { CrearEleccionInput } from './admin.schemas.js';
 
@@ -68,6 +68,47 @@ export async function listarEleccionesAgrupadas(): Promise<EleccionesAgrupadas> 
   }
 
   return agrupadas;
+}
+
+// ─── DELETE /api/admin/elecciones/:id ───────────────────────
+
+/**
+ * Elimina una elección de la BD siempre que no haya comenzado.
+ * El criterio es defensivo: comprueba estado === 'creada' Y fecha_inicio
+ * futura, por si el job de apertura automática no corrió todavía.
+ * El contrato en BFA no se toca — es inmutable y queda huérfano sin votos.
+ * Las listas se eliminan automáticamente por ON DELETE CASCADE.
+ */
+export async function eliminarEleccion(
+  id: number,
+  adminPayload: JwtPayload,
+  ip: string,
+): Promise<void> {
+  const eleccion = await prisma.eleccion.findUnique({
+    where: { id },
+    select: { id: true, nombre: true, estado: true, fechaInicio: true },
+  });
+
+  if (!eleccion) {
+    throw new NoEncontradoError(`No existe una elección con id ${id}.`);
+  }
+
+  const ahora = new Date();
+  if (eleccion.estado !== 'creada' || eleccion.fechaInicio <= ahora) {
+    throw new ConflictoError(
+      'No se puede eliminar una elección que ya comenzó o cuya fecha de inicio ya pasó.',
+    );
+  }
+
+  await prisma.eleccion.delete({ where: { id } });
+
+  await registrarLog({
+    tipoEvento: 'eleccion_eliminada',
+    rolUsuario: 'administrador',
+    descripcion: `Elección "${eleccion.nombre}" (id ${id}) eliminada.`,
+    idUsuario: adminPayload.sub,
+    ip,
+  });
 }
 
 // ─── POST /api/admin/elecciones ──────────────────────────────
