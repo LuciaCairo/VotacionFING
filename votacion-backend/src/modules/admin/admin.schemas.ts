@@ -5,6 +5,11 @@ const listaInputSchema = z.object({
     .string()
     .min(1, 'El nombre de la lista no puede estar vacío')
     .max(100, 'El nombre de la lista no puede superar 100 caracteres'),
+  color: z
+    .string()
+    .regex(/^#[0-9A-Fa-f]{6}$/, 'El color debe ser un valor hexadecimal válido (ej: #A3B4C5)')
+    .optional()
+    .nullable(),
 });
 
 export const crearEleccionSchema = z.object({

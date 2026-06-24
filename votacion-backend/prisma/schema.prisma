@@ -82,6 +82,8 @@ model Lista {
   // Posicion 0-based en el array _listas que se paso al constructor del contrato.
   // Critico para cruzar obtenerTodosLosVotos() con los registros de BD.
   indice     Int     @map("indice")
+  // Color hex (#RRGGBB) para la visualizacion en el frontend. Nullable: el admin lo elige opcionalmente.
+  color      String? @db.VarChar(7)
 
   // ON DELETE CASCADE: al borrar la eleccion se borran sus listas.
   eleccion Eleccion @relation(fields: [idEleccion], references: [id], onDelete: Cascade)

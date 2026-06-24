@@ -17,6 +17,7 @@ interface ListaResumenDTO {
   id: number;
   nombre: string;
   indice: number;
+  color: string | null;
 }
 
 interface EleccionResumenDTO {
@@ -48,7 +49,7 @@ export async function listarEleccionesAgrupadas(): Promise<EleccionesAgrupadas> 
     include: {
       listas: {
         orderBy: { indice: 'asc' },
-        select: { id: true, nombre: true, indice: true },
+        select: { id: true, nombre: true, indice: true, color: true },
       },
     },
   });
@@ -286,6 +287,7 @@ export async function crearEleccion(
               // del elemento en el array _listas del contrato.
               indice,
               esBlanco: nombreLista === VOTO_EN_BLANCO,
+              color: nombreLista === VOTO_EN_BLANCO ? '#FFFFFF' : (listas[indice]?.color ?? null),
             })),
           },
         },
@@ -327,6 +329,7 @@ export async function crearEleccion(
       nombre: l.nombre,
       indice: l.indice,
       es_blanco: l.esBlanco,
+      color: l.color,
     })),
   };
 }
