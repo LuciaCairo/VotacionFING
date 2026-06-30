@@ -1,6 +1,10 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { obtenerEleccionesVigentes, obtenerDetalleEleccion } from './votante.service.js';
-import { eleccionIdParamSchema } from './votante.schemas.js';
+import {
+  obtenerEleccionesVigentes,
+  obtenerDetalleEleccion,
+  emitirVoto,
+} from './votante.service.js';
+import { eleccionIdParamSchema, votarBodySchema } from './votante.schemas.js';
 
 /**
  * Rutas del votante. Todas requieren JWT con rol "votante".
@@ -22,5 +26,13 @@ export const votanteRoutes: FastifyPluginAsync = async (app) => {
     const { id } = eleccionIdParamSchema.parse(req.params);
     const resultado = await obtenerDetalleEleccion(id, req.user.sub);
     return reply.code(200).send(resultado);
+  });
+
+  // ─── POST /api/votante/elecciones/:id/votar ─────────────────
+  app.post('/elecciones/:id/votar', { preHandler: soloVotante }, async (req, reply) => {
+    const { id } = eleccionIdParamSchema.parse(req.params);
+    const { indice_lista } = votarBodySchema.parse(req.body);
+    const resultado = await emitirVoto(id, req.user.sub, indice_lista, req.ip ?? null);
+    return reply.code(201).send(resultado);
   });
 };

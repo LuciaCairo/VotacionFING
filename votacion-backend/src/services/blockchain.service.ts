@@ -24,12 +24,15 @@ const provider = new ethers.JsonRpcProvider(env.BFA_RPC_URL, {
 const signer = new ethers.Wallet(env.BACKEND_PRIVATE_KEY, provider);
 
 /**
- * Hash anonimo del votante: keccak256(legajo + SALT_SECRETO).
- * Es lo unico que se envia al contrato para el control de doble voto.
+ * Hash anonimo del votante: keccak256(legajo + idEleccion + SALT_SECRETO).
+ * Incluir el idEleccion hace que el mismo votante genere un hash distinto en
+ * cada eleccion, impidiendo correlacionar su comportamiento entre elecciones.
+ * El hash sigue siendo determinístico dentro de una eleccion (mismo votante +
+ * misma eleccion = mismo hash), lo que permite al contrato detectar doble voto.
  * Sin el salt no es posible reconstruir la correspondencia legajo->hash.
  */
-export function hashVotante(legajo: string): string {
-  return ethers.keccak256(ethers.toUtf8Bytes(legajo + env.SALT_SECRETO));
+export function hashVotante(legajo: string, idEleccion: number): string {
+  return ethers.keccak256(ethers.toUtf8Bytes(legajo + idEleccion + env.SALT_SECRETO));
 }
 
 /**
