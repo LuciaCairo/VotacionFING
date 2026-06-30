@@ -113,6 +113,35 @@ export async function obtenerEleccionesVigentes(votanteId: number) {
   };
 }
 
+// ─── Helper: extracción de motivo de revert (ethers v6) ──────
+// ethers v6 expone el motivo del revert en distintos lugares según la versión
+// del nodo y el tipo de error. La jerarquía de búsqueda es:
+//   1. err.reason          → string decodificado más limpio (disponible si el ABI matchea)
+//   2. err.shortMessage    → puede traer "execution reverted: <motivo>"
+//   3. err.info.error.message → fallback para nodos que devuelven el mensaje en el payload JSON
+function extraerMotivoRevert(err: unknown): string {
+  if (!err || typeof err !== 'object') return '';
+  const e = err as Record<string, unknown>;
+
+  if (typeof e.reason === 'string' && e.reason.length > 0) return e.reason;
+
+  for (const campo of ['shortMessage', 'message'] as const) {
+    if (typeof e[campo] === 'string') {
+      const m = (e[campo] as string).match(/execution reverted:\s*"?([^"]+)"?\s*$/i);
+      if (m) return m[1].trim();
+    }
+  }
+
+  const infoErr = (e.info as Record<string, unknown> | undefined)
+    ?.error as Record<string, unknown> | undefined;
+  if (typeof infoErr?.message === 'string') {
+    const m = infoErr.message.match(/execution reverted:\s*"?([^"]+)"?\s*$/i);
+    if (m) return m[1].trim();
+  }
+
+  return '';
+}
+
 // ─── POST /api/votante/elecciones/:id/votar ───────────────────
 
 /**
@@ -223,7 +252,44 @@ export async function emitirVoto(
     });
     txHash = resultado.txHash;
   } catch (err) {
-    logger.error({ err, eleccionId }, 'Fallo el registro del voto en BFA');
+    const esRevert = (err as { code?: string })?.code === 'CALL_EXCEPTION';
+
+    if (esRevert) {
+      // Revert del contrato: no reintentable. Mapeamos los mensajes conocidos.
+      const motivo = extraerMotivoRevert(err);
+
+      if (motivo.includes('ya voto')) {
+        // BFA detectó doble voto aunque PARTICIPACION no lo tenía (inconsistencia o race).
+        logger.warn({ eleccionId }, 'BFA: doble voto detectado por el contrato');
+        throw new ConflictoError('Ya emitiste tu voto en esta elección.');
+      }
+      if (motivo.includes('todavia no empezo')) {
+        logger.warn({ eleccionId }, 'BFA: revert — elección aún no abierta según contrato');
+        throw new ConflictoError('La elección todavía no está abierta para votar.');
+      }
+      if (motivo.includes('ya termino')) {
+        logger.warn({ eleccionId }, 'BFA: revert — elección finalizada según contrato');
+        throw new ConflictoError('La elección ya finalizó.');
+      }
+      if (motivo.includes('Lista invalida')) {
+        logger.warn({ eleccionId }, 'BFA: revert — índice de lista inválido según contrato');
+        throw new ValidacionError('El índice de lista no es válido para esta elección.');
+      }
+      if (motivo.includes('backend autorizado')) {
+        // Problema de configuración: la clave del backend no coincide con la registrada en el contrato.
+        logger.error({ err, eleccionId }, 'BFA: revert — backend no autorizado (CRÍTICO: revisar BACKEND_PRIVATE_KEY)');
+        throw new InternoError('Error de configuración del sistema de votación.');
+      }
+
+      // Revert con motivo desconocido: loguear para investigar.
+      logger.error({ err, eleccionId, motivo }, 'BFA: revert desconocido del contrato');
+      throw new InternoError(
+        'No se pudo registrar el voto en la blockchain. Podés intentar nuevamente.',
+      );
+    }
+
+    // Error de infraestructura (red, timeout, gas, nonce, provider): reintentable.
+    logger.error({ err, eleccionId }, 'BFA: error de infraestructura al registrar voto');
     throw new InternoError(
       'No se pudo registrar el voto en la blockchain. Podés intentar nuevamente.',
     );
