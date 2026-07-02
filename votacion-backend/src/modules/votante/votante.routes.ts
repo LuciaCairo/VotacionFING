@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import {
   obtenerEleccionesVigentes,
+  obtenerEleccionesFinalizadas,
   obtenerDetalleEleccion,
   emitirVoto,
   obtenerComprobante,
@@ -19,6 +20,13 @@ export const votanteRoutes: FastifyPluginAsync = async (app) => {
   // Ruta estática registrada ANTES que la paramétrica /:id para evitar colisión.
   app.get('/elecciones/vigentes', { preHandler: soloVotante }, async (req, reply) => {
     const resultado = await obtenerEleccionesVigentes(req.user.sub);
+    return reply.code(200).send(resultado);
+  });
+
+  // ─── GET /api/votante/elecciones/finalizadas ────────────────
+  // Ruta estática registrada ANTES que la paramétrica /:id para evitar colisión.
+  app.get('/elecciones/finalizadas', { preHandler: soloVotante }, async (_req, reply) => {
+    const resultado = await obtenerEleccionesFinalizadas();
     return reply.code(200).send(resultado);
   });
 

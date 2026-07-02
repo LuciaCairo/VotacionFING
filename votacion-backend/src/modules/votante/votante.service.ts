@@ -113,6 +113,70 @@ export async function obtenerEleccionesVigentes(votanteId: number) {
   };
 }
 
+// ─── GET /api/votante/elecciones/finalizadas ─────────────────
+
+/**
+ * Listado liviano de elecciones finalizadas con un resumen del resultado
+ * (sin desglose de votos por lista — eso lo da GET /api/elecciones/:id/resultados).
+ *
+ * Si el snapshot todavía no se generó (snapshotAt = null) o quedó
+ * incompleto (algún campo del snapshot en null pese a tener snapshotAt,
+ * o la lista ganadora no se puede resolver), el resultado se marca como
+ * "pendiente" en vez de romper el listado o mostrar datos parciales.
+ */
+export async function obtenerEleccionesFinalizadas() {
+  const elecciones = await prisma.eleccion.findMany({
+    where: { estado: 'finalizada' },
+    orderBy: { fechaCierre: 'desc' },
+    select: {
+      id: true,
+      nombre: true,
+      fechaInicio: true,
+      fechaCierre: true,
+      totalVotos: true,
+      resultadoTipo: true,
+      idListaGanadora: true,
+      snapshotAt: true,
+      listas: { select: { id: true, nombre: true } },
+    },
+  });
+
+  return {
+    finalizadas: elecciones.map((e) => {
+      const base = {
+        id: e.id,
+        nombre: e.nombre,
+        fecha_inicio: e.fechaInicio.toISOString(),
+        fecha_cierre: e.fechaCierre.toISOString(),
+      };
+
+      const listaGanadora =
+        e.resultadoTipo === 'ganador_unico'
+          ? e.listas.find((l) => l.id === e.idListaGanadora)?.nombre
+          : undefined;
+
+      const snapshotIncompleto =
+        !e.snapshotAt ||
+        e.totalVotos === null ||
+        e.resultadoTipo === null ||
+        (e.resultadoTipo === 'ganador_unico' && !listaGanadora);
+
+      if (snapshotIncompleto) {
+        return { ...base, total_votos: null, resultado: { tipo: 'pendiente' as const } };
+      }
+
+      return {
+        ...base,
+        total_votos: e.totalVotos,
+        resultado:
+          e.resultadoTipo === 'ganador_unico'
+            ? { tipo: 'ganador_unico' as const, lista_ganadora: listaGanadora as string }
+            : { tipo: 'empate' as const },
+      };
+    }),
+  };
+}
+
 // ─── GET /api/votante/elecciones/:id/comprobante ─────────────
 
 /**
