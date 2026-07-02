@@ -113,6 +113,35 @@ export async function obtenerEleccionesVigentes(votanteId: number) {
   };
 }
 
+// ─── GET /api/votante/elecciones/:id/comprobante ─────────────
+
+/**
+ * Devuelve el comprobante del voto del votante en la elección indicada.
+ * Solo confirma participación; nunca revela la lista elegida (HU-07).
+ */
+export async function obtenerComprobante(eleccionId: number, votanteId: number) {
+  const participacion = await prisma.participacion.findUnique({
+    where: {
+      uq_participacion_votante_eleccion: { idVotante: votanteId, idEleccion: eleccionId },
+    },
+    select: {
+      txHash: true,
+      fechaVoto: true,
+      eleccion: { select: { nombre: true } },
+    },
+  });
+
+  if (!participacion) {
+    throw new NoEncontradoError('No tenés un comprobante para esta elección.');
+  }
+
+  return {
+    eleccion: participacion.eleccion.nombre,
+    hash: participacion.txHash,
+    fecha_voto: participacion.fechaVoto.toISOString(),
+  };
+}
+
 // ─── Helper: extracción de motivo de revert (ethers v6) ──────
 // ethers v6 expone el motivo del revert en distintos lugares según la versión
 // del nodo y el tipo de error. La jerarquía de búsqueda es:

@@ -3,6 +3,7 @@ import {
   obtenerEleccionesVigentes,
   obtenerDetalleEleccion,
   emitirVoto,
+  obtenerComprobante,
 } from './votante.service.js';
 import { eleccionIdParamSchema, votarBodySchema } from './votante.schemas.js';
 
@@ -25,6 +26,13 @@ export const votanteRoutes: FastifyPluginAsync = async (app) => {
   app.get('/elecciones/:id', { preHandler: soloVotante }, async (req, reply) => {
     const { id } = eleccionIdParamSchema.parse(req.params);
     const resultado = await obtenerDetalleEleccion(id, req.user.sub);
+    return reply.code(200).send(resultado);
+  });
+
+  // ─── GET /api/votante/elecciones/:id/comprobante ────────────
+  app.get('/elecciones/:id/comprobante', { preHandler: soloVotante }, async (req, reply) => {
+    const { id } = eleccionIdParamSchema.parse(req.params);
+    const resultado = await obtenerComprobante(id, req.user.sub);
     return reply.code(200).send(resultado);
   });
 
