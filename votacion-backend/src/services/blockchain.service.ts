@@ -124,5 +124,54 @@ export async function yaVotoEnContrato(contratoAddress: string, hash: string): P
   return contrato.yaVotoEstaPersona(hash);
 }
 
+// ─── Lecturas para la verificacion de integridad (auditoria BD vs BFA) ──
+
+/**
+ * Indica si hay codigo desplegado en la address. Una address sin codigo
+ * (mal cargada, contrato inexistente) hace fallar cualquier otra lectura
+ * con un error de decodificacion en vez de uno de red, por eso se chequea
+ * aparte antes de leer el resto de los datos del contrato.
+ */
+export async function contratoTieneCodigo(address: string): Promise<boolean> {
+  const codigo = await provider.getCode(address);
+  return codigo !== '0x';
+}
+
+/** Lee el nombre de la eleccion grabado (inmutable) en el contrato. */
+export async function obtenerNombreEleccion(contratoAddress: string): Promise<string> {
+  const contrato = contratoLectura(contratoAddress);
+  return contrato.nombreEleccion();
+}
+
+/** Lee la fecha de apertura (unix segundos) grabada en el contrato. */
+export async function obtenerFechaApertura(contratoAddress: string): Promise<number> {
+  const contrato = contratoLectura(contratoAddress);
+  const valor: bigint = await contrato.fechaApertura();
+  return Number(valor);
+}
+
+/** Lee la fecha de cierre (unix segundos) grabada en el contrato. */
+export async function obtenerFechaCierre(contratoAddress: string): Promise<number> {
+  const contrato = contratoLectura(contratoAddress);
+  const valor: bigint = await contrato.fechaCierre();
+  return Number(valor);
+}
+
+/** Lee la cantidad de listas grabadas en el contrato. */
+export async function obtenerCantidadListas(contratoAddress: string): Promise<number> {
+  const contrato = contratoLectura(contratoAddress);
+  const valor: bigint = await contrato.cantidadListas();
+  return Number(valor);
+}
+
+/** Lee el nombre de la lista en un indice puntual del contrato. */
+export async function obtenerListaPorIndice(
+  contratoAddress: string,
+  indice: number,
+): Promise<string> {
+  const contrato = contratoLectura(contratoAddress);
+  return contrato.obtenerLista(indice);
+}
+
 /** Expone utilidades de bajo nivel por si se necesitan en tests. */
 export const _internals = { provider, signer };

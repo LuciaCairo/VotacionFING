@@ -1,8 +1,24 @@
 import { prisma } from '../../config/prisma.js';
 import { logger } from '../../config/logger.js';
-import { desplegarContrato } from '../../services/blockchain.service.js';
+import {
+  desplegarContrato,
+  contratoTieneCodigo,
+  obtenerNombreEleccion,
+  obtenerFechaApertura,
+  obtenerFechaCierre,
+  obtenerCantidadListas,
+  obtenerListaPorIndice,
+  obtenerVotos,
+  yaVotoEnContrato,
+} from '../../services/blockchain.service.js';
 import { registrarLog } from '../../services/log.service.js';
-import { ValidacionError, InternoError, NoEncontradoError, ConflictoError } from '../../utils/errors.js';
+import {
+  ValidacionError,
+  InternoError,
+  NoEncontradoError,
+  ConflictoError,
+  ServicioNoDisponibleError,
+} from '../../utils/errors.js';
 import type { JwtPayload } from '../../types/auth.js';
 import type { CrearEleccionInput } from './admin.schemas.js';
 
@@ -331,5 +347,318 @@ export async function crearEleccion(
       es_blanco: l.esBlanco,
       color: l.color,
     })),
+  };
+}
+
+// ─── GET /api/admin/elecciones/:id/integridad ─────────────────
+// HU-24: auditoría de integridad, BD vs. contrato en BFA.
+
+interface EleccionParaIntegridad {
+  id: number;
+  nombre: string;
+  estado: string;
+  fechaInicio: Date;
+  fechaCierre: Date;
+  contratoAddress: string | null;
+  totalVotos: number | null;
+  snapshotAt: Date | null;
+  listas: { nombre: string; indice: number; resultados: { votos: number }[] }[];
+  participaciones: { id: number; hashBlockchain: string }[];
+}
+
+/** Datos leídos del contrato. `tieneCodigo: false` corta la lectura del resto. */
+interface DatosBfa {
+  tieneCodigo: boolean;
+  nombre?: string;
+  fechaApertura?: number;
+  fechaCierre?: number;
+  cantidadListas?: number;
+  nombresListas?: string[];
+  votos?: number[];
+  hashesVotaron?: Map<string, boolean>;
+}
+
+interface IntegridadCheck {
+  campo: string;
+  ok: boolean;
+  bd?: string | number | boolean | null;
+  bfa?: string | number | boolean | null;
+  /** true solo en el check de consistencia interna (estado vs. fechas): no compara contra BFA. */
+  interno?: boolean;
+}
+
+interface IntegridadSeccion {
+  estado: 'verificada' | 'discrepancias' | 'no_aplica';
+  checks: IntegridadCheck[];
+}
+
+/** "no_aplica" si no hay ningun check comparable (BD vs BFA) en la seccion. */
+function estadoDeChecks(checks: IntegridadCheck[]): IntegridadSeccion['estado'] {
+  const comparables = checks.filter((c) => !c.interno);
+  if (comparables.length === 0) return 'no_aplica';
+  return comparables.every((c) => c.ok) ? 'verificada' : 'discrepancias';
+}
+
+const SIN_CODIGO = 'no verificable (el contrato no tiene código en la blockchain)';
+
+function construirSeccionEleccion(e: EleccionParaIntegridad, bfa: DatosBfa): IntegridadSeccion {
+  const checks: IntegridadCheck[] = [
+    {
+      campo: 'Contrato desplegado (código presente en la address)',
+      ok: bfa.tieneCodigo,
+      bd: e.contratoAddress,
+      bfa: bfa.tieneCodigo ? 'código presente' : 'sin código',
+    },
+  ];
+
+  const fechaInicioUnix = Math.floor(e.fechaInicio.getTime() / 1000);
+  const fechaCierreUnix = Math.floor(e.fechaCierre.getTime() / 1000);
+
+  checks.push(
+    {
+      campo: 'nombre',
+      ok: bfa.tieneCodigo && e.nombre === bfa.nombre,
+      bd: e.nombre,
+      bfa: bfa.tieneCodigo ? (bfa.nombre ?? null) : SIN_CODIGO,
+    },
+    {
+      campo: 'fecha_inicio (unix)',
+      ok: bfa.tieneCodigo && fechaInicioUnix === bfa.fechaApertura,
+      bd: fechaInicioUnix,
+      bfa: bfa.tieneCodigo ? (bfa.fechaApertura ?? null) : SIN_CODIGO,
+    },
+    {
+      campo: 'fecha_cierre (unix)',
+      ok: bfa.tieneCodigo && fechaCierreUnix === bfa.fechaCierre,
+      bd: fechaCierreUnix,
+      bfa: bfa.tieneCodigo ? (bfa.fechaCierre ?? null) : SIN_CODIGO,
+    },
+  );
+
+  // Consistencia interna: el estado (creada/publicada/finalizada) no existe
+  // en el contrato, así que esto NO es una comparación contra BFA.
+  const ahora = new Date();
+  const estadoCoherente =
+    (e.estado === 'creada' && e.fechaInicio > ahora) ||
+    (e.estado === 'publicada' && e.fechaInicio <= ahora && e.fechaCierre > ahora) ||
+    (e.estado === 'finalizada' && e.fechaCierre <= ahora);
+  checks.push({
+    campo: 'Consistencia interna: estado vs. fechas (NO compara contra BFA — el estado no existe en el contrato)',
+    ok: estadoCoherente,
+    bd: `${e.estado} (inicio ${e.fechaInicio.toISOString()}, cierre ${e.fechaCierre.toISOString()}, ahora ${ahora.toISOString()})`,
+    interno: true,
+  });
+
+  return { estado: estadoDeChecks(checks), checks };
+}
+
+function construirSeccionListas(e: EleccionParaIntegridad, bfa: DatosBfa): IntegridadSeccion {
+  if (!bfa.tieneCodigo) {
+    return {
+      estado: 'discrepancias',
+      checks: [{ campo: 'cantidad_listas', ok: false, bd: e.listas.length, bfa: SIN_CODIGO }],
+    };
+  }
+
+  const checks: IntegridadCheck[] = [
+    {
+      campo: 'cantidad_listas',
+      ok: e.listas.length === bfa.cantidadListas,
+      bd: e.listas.length,
+      bfa: bfa.cantidadListas ?? null,
+    },
+  ];
+
+  const cantidadMaxima = Math.max(e.listas.length, bfa.nombresListas?.length ?? 0);
+  for (let indice = 0; indice < cantidadMaxima; indice++) {
+    const listaBd = e.listas.find((l) => l.indice === indice);
+    const nombreBfa = bfa.nombresListas?.[indice];
+    checks.push({
+      campo: `lista[${indice}].nombre`,
+      ok: listaBd !== undefined && nombreBfa !== undefined && listaBd.nombre === nombreBfa,
+      bd: listaBd?.nombre ?? null,
+      bfa: nombreBfa ?? null,
+    });
+  }
+
+  return { estado: estadoDeChecks(checks), checks };
+}
+
+function construirSeccionResultados(e: EleccionParaIntegridad, bfa: DatosBfa): IntegridadSeccion {
+  // Solo aplica a elecciones finalizadas con snapshot ya tomado.
+  if (e.estado !== 'finalizada' || !e.snapshotAt) {
+    return { estado: 'no_aplica', checks: [] };
+  }
+
+  if (!bfa.tieneCodigo) {
+    return {
+      estado: 'discrepancias',
+      checks: [{ campo: 'total_votos', ok: false, bd: e.totalVotos, bfa: SIN_CODIGO }],
+    };
+  }
+
+  const votosBfa = bfa.votos ?? [];
+  const totalBfa = votosBfa.reduce((acc, v) => acc + v, 0);
+
+  const checks: IntegridadCheck[] = e.listas.map((lista) => {
+    const votosBd = lista.resultados[0]?.votos ?? null;
+    const votosContrato = votosBfa[lista.indice] ?? null;
+    return {
+      campo: `votos["${lista.nombre}"] (índice ${lista.indice})`,
+      ok: votosBd !== null && votosContrato !== null && votosBd === votosContrato,
+      bd: votosBd,
+      bfa: votosContrato,
+    };
+  });
+
+  checks.push({
+    campo: 'total_votos',
+    ok: e.totalVotos !== null && e.totalVotos === totalBfa,
+    bd: e.totalVotos,
+    bfa: totalBfa,
+  });
+
+  return { estado: estadoDeChecks(checks), checks };
+}
+
+function construirSeccionParticipacion(e: EleccionParaIntegridad, bfa: DatosBfa): IntegridadSeccion {
+  if (!bfa.tieneCodigo) {
+    return {
+      estado: 'discrepancias',
+      checks: [
+        { campo: 'cantidad_participaciones vs. total de votos en el contrato', ok: false, bd: e.participaciones.length, bfa: SIN_CODIGO },
+      ],
+    };
+  }
+
+  const totalVotosBfa = (bfa.votos ?? []).reduce((acc, v) => acc + v, 0);
+
+  const checks: IntegridadCheck[] = [
+    {
+      campo: 'cantidad_participaciones vs. total de votos en el contrato',
+      ok: e.participaciones.length === totalVotosBfa,
+      bd: e.participaciones.length,
+      bfa: totalVotosBfa,
+    },
+  ];
+
+  for (const p of e.participaciones) {
+    const votoEnContrato = bfa.hashesVotaron?.get(p.hashBlockchain) ?? false;
+    checks.push({
+      campo: `yaVotoEstaPersona — participación #${p.id}`,
+      ok: votoEnContrato,
+      bd: p.hashBlockchain,
+      bfa: votoEnContrato,
+    });
+  }
+
+  return { estado: estadoDeChecks(checks), checks };
+}
+
+/**
+ * Verifica la integridad de TODOS los datos de una elección comparando la
+ * BD contra el contrato en BFA (HU-24). Cuatro secciones: eleccion, listas,
+ * resultados (no_aplica si todavía no hay snapshot) y participacion.
+ *
+ * Si el nodo de BFA no responde, se corta con 503: nunca se devuelve
+ * "verificada" cuando no se pudo comparar contra la blockchain. Que el
+ * contrato exista pero sin código, en cambio, SÍ es una respuesta válida
+ * de BFA — se refleja como discrepancia, no como error de conectividad.
+ */
+export async function verificarIntegridadEleccion(
+  eleccionId: number,
+  adminPayload: JwtPayload,
+  ip: string,
+) {
+  const eleccion = await prisma.eleccion.findUnique({
+    where: { id: eleccionId },
+    select: {
+      id: true,
+      nombre: true,
+      estado: true,
+      fechaInicio: true,
+      fechaCierre: true,
+      contratoAddress: true,
+      totalVotos: true,
+      snapshotAt: true,
+      listas: {
+        orderBy: { indice: 'asc' },
+        select: { nombre: true, indice: true, resultados: { select: { votos: true } } },
+      },
+      participaciones: { select: { id: true, hashBlockchain: true } },
+    },
+  });
+
+  if (!eleccion) {
+    throw new NoEncontradoError(`No existe una elección con id ${eleccionId}.`);
+  }
+
+  if (!eleccion.contratoAddress) {
+    throw new ConflictoError(
+      'La elección no tiene contrato desplegado en BFA; no se puede verificar su integridad.',
+    );
+  }
+  const contratoAddress = eleccion.contratoAddress;
+
+  let bfa: DatosBfa;
+  try {
+    const tieneCodigo = await contratoTieneCodigo(contratoAddress);
+
+    if (!tieneCodigo) {
+      bfa = { tieneCodigo: false };
+    } else {
+      const [nombre, fechaApertura, fechaCierre, cantidadListas, votos] = await Promise.all([
+        obtenerNombreEleccion(contratoAddress),
+        obtenerFechaApertura(contratoAddress),
+        obtenerFechaCierre(contratoAddress),
+        obtenerCantidadListas(contratoAddress),
+        obtenerVotos(contratoAddress),
+      ]);
+
+      const nombresListas = await Promise.all(
+        Array.from({ length: cantidadListas }, (_, indice) =>
+          obtenerListaPorIndice(contratoAddress, indice),
+        ),
+      );
+
+      const hashesUnicos = [...new Set(eleccion.participaciones.map((p) => p.hashBlockchain))];
+      const resultadosHash = await Promise.all(
+        hashesUnicos.map((hash) => yaVotoEnContrato(contratoAddress, hash)),
+      );
+      const hashesVotaron = new Map(hashesUnicos.map((hash, i) => [hash, resultadosHash[i]]));
+
+      bfa = { tieneCodigo: true, nombre, fechaApertura, fechaCierre, cantidadListas, nombresListas, votos, hashesVotaron };
+    }
+  } catch (err) {
+    logger.error({ err, eleccionId }, 'No se pudo conectar a BFA para verificar integridad');
+    throw new ServicioNoDisponibleError(
+      'No se pudo conectar a la blockchain (BFA) para verificar la integridad. Intentá nuevamente en unos minutos.',
+    );
+  }
+
+  const secciones = {
+    eleccion: construirSeccionEleccion(eleccion, bfa),
+    listas: construirSeccionListas(eleccion, bfa),
+    resultados: construirSeccionResultados(eleccion, bfa),
+    participacion: construirSeccionParticipacion(eleccion, bfa),
+  };
+
+  const integridadGlobal = Object.values(secciones).every((s) => s.estado !== 'discrepancias')
+    ? 'verificada'
+    : 'discrepancias';
+
+  await registrarLog({
+    tipoEvento: 'verificacion_integridad',
+    rolUsuario: 'administrador',
+    descripcion: `Verificación de integridad de la elección "${eleccion.nombre}" (id ${eleccionId}): ${integridadGlobal}.`,
+    idUsuario: adminPayload.sub,
+    ip,
+  });
+
+  return {
+    eleccion_id: eleccion.id,
+    verificado_at: new Date().toISOString(),
+    integridad_global: integridadGlobal,
+    secciones,
   };
 }

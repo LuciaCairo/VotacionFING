@@ -57,3 +57,10 @@ export class InternoError extends AppError {
     super(500, mensaje);
   }
 }
+
+/** 503 — dependencia externa no disponible (ej: nodo BFA caído). */
+export class ServicioNoDisponibleError extends AppError {
+  constructor(mensaje = 'Servicio no disponible') {
+    super(503, mensaje);
+  }
+}

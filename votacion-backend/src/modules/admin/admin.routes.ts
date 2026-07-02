@@ -1,5 +1,12 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { listarEleccionesAgrupadas, crearEleccion, eliminarEleccion, listarPadron, descargarPadronCsv } from './admin.service.js';
+import {
+  listarEleccionesAgrupadas,
+  crearEleccion,
+  eliminarEleccion,
+  listarPadron,
+  descargarPadronCsv,
+  verificarIntegridadEleccion,
+} from './admin.service.js';
 import { crearEleccionSchema, eleccionIdParamSchema, padronQuerySchema } from './admin.schemas.js';
 import { obtenerIp } from '../../utils/request.js';
 
@@ -47,5 +54,12 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
     const { id } = eleccionIdParamSchema.parse(req.params);
     await eliminarEleccion(id, req.user, obtenerIp(req));
     return reply.code(200).send({ mensaje: 'Elección eliminada correctamente.' });
+  });
+
+  // ─── GET /api/admin/elecciones/:id/integridad ───────────────
+  app.get('/elecciones/:id/integridad', { preHandler: soloAdmin }, async (req, reply) => {
+    const { id } = eleccionIdParamSchema.parse(req.params);
+    const resultado = await verificarIntegridadEleccion(id, req.user, obtenerIp(req));
+    return reply.code(200).send(resultado);
   });
 };
