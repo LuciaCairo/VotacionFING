@@ -20,6 +20,11 @@ enum EstadoEleccion {
   finalizada
 }
 
+enum ResultadoTipo {
+  ganador_unico
+  empate
+}
+
 enum TipoEvento {
   login_exitoso
   login_fallido
@@ -66,8 +71,16 @@ model Eleccion {
   estado          EstadoEleccion @default(creada)
   createdAt       DateTime       @default(now()) @map("created_at")
 
-  listas         Lista[]
+  // ─ Snapshot de resultados (solo elecciones finalizadas, ver modelo Resultado) ─
+  // Nullable: se completan recien al tomar el snapshot al finalizar la eleccion.
+  totalVotos      Int?           @map("total_votos")
+  resultadoTipo   ResultadoTipo? @map("resultado_tipo")
+  idListaGanadora Int?           @map("id_lista_ganadora")
+  snapshotAt      DateTime?      @map("snapshot_at")
+
+  listas          Lista[]
   participaciones Participacion[]
+  resultados      Resultado[]
 
   @@map("eleccion")
 }
@@ -88,12 +101,36 @@ model Lista {
   // ON DELETE CASCADE: al borrar la eleccion se borran sus listas.
   eleccion Eleccion @relation(fields: [idEleccion], references: [id], onDelete: Cascade)
 
+  resultados Resultado[]
+
   // Evita dos listas con el mismo nombre dentro de la misma eleccion.
   @@unique([idEleccion, nombre], name: "uq_lista_eleccion_nombre")
   // Evita indices duplicados dentro de la misma eleccion.
   @@unique([idEleccion, indice], name: "uq_lista_eleccion_indice")
   @@index([idEleccion])
   @@map("lista")
+}
+
+// ─── RESULTADO ───────────────────────────────────────────────
+// Snapshot de los votos por lista, tomado del contrato en BFA al
+// finalizar la eleccion (estrategia hibrida: ver README).
+
+model Resultado {
+  id         Int @id @default(autoincrement())
+  idEleccion Int @map("id_eleccion")
+  idLista    Int @map("id_lista")
+  // Indice de la lista en el contrato (cruza con Lista.indice), copiado aca
+  // para poder auditar el snapshot sin depender de que Lista no cambie.
+  indice     Int
+  votos      Int
+
+  // ON DELETE CASCADE: al borrar la eleccion o la lista se borra su resultado.
+  eleccion Eleccion @relation(fields: [idEleccion], references: [id], onDelete: Cascade)
+  lista    Lista    @relation(fields: [idLista], references: [id], onDelete: Cascade)
+
+  @@unique([idEleccion, idLista], name: "uq_resultado_eleccion_lista")
+  @@index([idEleccion])
+  @@map("resultado")
 }
 
 // ─── VOTANTE ─────────────────────────────────────────────────

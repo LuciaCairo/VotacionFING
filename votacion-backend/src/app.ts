@@ -11,6 +11,7 @@ import errorHandlerPlugin from './plugins/error-handler.plugin.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { votanteRoutes } from './modules/votante/votante.routes.js';
 import { adminRoutes } from './modules/admin/admin.routes.js';
+import { eleccionRoutes } from './modules/eleccion/eleccion.routes.js';
 
 /**
  * Construye la instancia de Fastify con todos los plugins y rutas.
@@ -48,6 +49,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(votanteRoutes, { prefix: '/api/votante' });
   await app.register(adminRoutes, { prefix: '/api/admin' });
+  await app.register(eleccionRoutes, { prefix: '/api/elecciones' });
 
   return app;
 }
