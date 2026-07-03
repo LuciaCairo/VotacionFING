@@ -39,6 +39,10 @@ const envSchema = z.object({
     .regex(/^0x[0-9a-fA-F]{40}$/, 'BACKEND_ADDRESS debe ser una address valida'),
   BFA_DEPLOY_GAS_LIMIT: z.coerce.number().int().positive().default(3_000_000),
 
+  // Umbrales de saldo de la wallet del backend
+  SALDO_UMBRAL_ADVERTENCIA: z.coerce.number().positive().default(0.5),
+  SALDO_UMBRAL_CRITICO: z.coerce.number().positive().default(0.1),
+
   // Secreto del voto
   SALT_SECRETO: z
     .string()
@@ -54,13 +58,16 @@ const envSchema = z.object({
 
   // CORS
   CORS_ORIGINS: z.string().default('http://localhost:3000'),
+}).refine((data) => data.SALDO_UMBRAL_ADVERTENCIA > data.SALDO_UMBRAL_CRITICO, {
+  message: 'SALDO_UMBRAL_ADVERTENCIA debe ser mayor que SALDO_UMBRAL_CRITICO',
+  path: ['SALDO_UMBRAL_ADVERTENCIA'],
 });
 
 const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
   // No usamos el logger aca porque todavia no esta inicializado.
-  console.error('❌ Variables de entorno invalidas:');
+  console.error('Variables de entorno invalidas:');
   console.error(parsed.error.flatten().fieldErrors);
   process.exit(1);
 }

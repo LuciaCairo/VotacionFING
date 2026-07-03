@@ -6,6 +6,7 @@ import {
   listarPadron,
   descargarPadronCsv,
   verificarIntegridadEleccion,
+  consultarSaldoBlockchain,
 } from './admin.service.js';
 import { crearEleccionSchema, eleccionIdParamSchema, padronQuerySchema } from './admin.schemas.js';
 import { obtenerIp } from '../../utils/request.js';
@@ -60,6 +61,12 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   app.get('/elecciones/:id/integridad', { preHandler: soloAdmin }, async (req, reply) => {
     const { id } = eleccionIdParamSchema.parse(req.params);
     const resultado = await verificarIntegridadEleccion(id, req.user, obtenerIp(req));
+    return reply.code(200).send(resultado);
+  });
+
+  // ─── GET /api/admin/blockchain/saldo ────────────────────────
+  app.get('/blockchain/saldo', { preHandler: soloAdmin }, async (_req, reply) => {
+    const resultado = await consultarSaldoBlockchain();
     return reply.code(200).send(resultado);
   });
 };

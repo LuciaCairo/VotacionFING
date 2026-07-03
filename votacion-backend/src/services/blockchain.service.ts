@@ -112,6 +112,15 @@ export async function obtenerVotos(contratoAddress: string): Promise<number[]> {
   return votos.map((v) => Number(v));
 }
 
+/**
+ * Lee el saldo (en wei) de la wallet del backend en BFA. Es la cuenta que
+ * paga el gas de todos los deploys y votos; si se queda sin fondos, las
+ * elecciones dejan de poder crearse o votarse sin ningun aviso previo.
+ */
+export async function obtenerSaldoBackend(): Promise<bigint> {
+  return provider.getBalance(env.BACKEND_ADDRESS);
+}
+
 /** Consulta si la eleccion esta abierta segun el timestamp del contrato. */
 export async function estaAbierta(contratoAddress: string): Promise<boolean> {
   const contrato = contratoLectura(contratoAddress);

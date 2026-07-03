@@ -1,5 +1,7 @@
+import { ethers } from 'ethers';
 import { prisma } from '../../config/prisma.js';
 import { logger } from '../../config/logger.js';
+import { env } from '../../config/env.js';
 import {
   desplegarContrato,
   contratoTieneCodigo,
@@ -10,6 +12,7 @@ import {
   obtenerListaPorIndice,
   obtenerVotos,
   yaVotoEnContrato,
+  obtenerSaldoBackend,
 } from '../../services/blockchain.service.js';
 import { registrarLog } from '../../services/log.service.js';
 import {
@@ -660,5 +663,46 @@ export async function verificarIntegridadEleccion(
     verificado_at: new Date().toISOString(),
     integridad_global: integridadGlobal,
     secciones,
+  };
+}
+
+// ─── GET /api/admin/blockchain/saldo ───────────────────────────
+
+/**
+ * Consulta el saldo de gas de la wallet del backend en BFA — la cuenta que
+ * paga todos los deploys y votos — y lo clasifica según los umbrales
+ * configurados (SALDO_UMBRAL_ADVERTENCIA / SALDO_UMBRAL_CRITICO).
+ *
+ * Si BFA no responde no hay saldo "de mentira" ni "ok" por default:
+ * se corta con 503, igual que en verificarIntegridadEleccion.
+ */
+export async function consultarSaldoBlockchain() {
+  let saldoWei: bigint;
+  try {
+    saldoWei = await obtenerSaldoBackend();
+  } catch (err) {
+    logger.error({ err }, 'No se pudo consultar el saldo de la wallet del backend en BFA');
+    throw new ServicioNoDisponibleError(
+      'No se pudo conectar a la blockchain (BFA) para consultar el saldo. Intentá nuevamente en unos minutos.',
+    );
+  }
+
+  const saldo = ethers.formatEther(saldoWei);
+  const umbralAdvertencia = env.SALDO_UMBRAL_ADVERTENCIA;
+  const umbralCritico = env.SALDO_UMBRAL_CRITICO;
+  const saldoNumero = Number(saldo);
+
+  const estado: 'ok' | 'advertencia' | 'critico' =
+    saldoNumero <= umbralCritico ? 'critico' : saldoNumero <= umbralAdvertencia ? 'advertencia' : 'ok';
+
+  return {
+    address: env.BACKEND_ADDRESS,
+    saldo,
+    unidad: 'BFA',
+    estado,
+    umbrales: {
+      advertencia: umbralAdvertencia.toString(),
+      critico: umbralCritico.toString(),
+    },
   };
 }
