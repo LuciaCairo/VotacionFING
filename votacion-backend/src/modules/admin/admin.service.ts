@@ -391,15 +391,29 @@ interface IntegridadCheck {
 }
 
 interface IntegridadSeccion {
-  estado: 'verificada' | 'discrepancias' | 'no_aplica';
+  estado: 'verificada' | 'discrepancias' | 'con_advertencias' | 'no_aplica';
   checks: IntegridadCheck[];
 }
 
-/** "no_aplica" si no hay ningun check comparable (BD vs BFA) en la seccion. */
+/**
+ * "no_aplica" si no hay ningun check comparable (BD vs BFA) en la seccion.
+ * Los checks `interno` (no comparan contra BFA) nunca producen "discrepancias"
+ * por si solos, pero si alguno falla se refleja como "con_advertencias" en vez
+ * de quedar silenciado detras de un "verificada"/"no_aplica".
+ */
 function estadoDeChecks(checks: IntegridadCheck[]): IntegridadSeccion['estado'] {
   const comparables = checks.filter((c) => !c.interno);
-  if (comparables.length === 0) return 'no_aplica';
-  return comparables.every((c) => c.ok) ? 'verificada' : 'discrepancias';
+  const base: IntegridadSeccion['estado'] =
+    comparables.length === 0
+      ? 'no_aplica'
+      : comparables.every((c) => c.ok)
+        ? 'verificada'
+        : 'discrepancias';
+
+  if (base === 'discrepancias') return 'discrepancias';
+
+  const hayAdvertencia = checks.some((c) => c.interno && !c.ok);
+  return hayAdvertencia ? 'con_advertencias' : base;
 }
 
 const SIN_CODIGO = 'no verificable (el contrato no tiene código en la blockchain)';
@@ -667,9 +681,14 @@ export async function verificarIntegridadEleccion(
     participacion: construirSeccionParticipacion(eleccion, bfa),
   };
 
-  const integridadGlobal = Object.values(secciones).every((s) => s.estado !== 'discrepancias')
-    ? 'verificada'
-    : 'discrepancias';
+  const valoresSecciones = Object.values(secciones);
+  const integridadGlobal: IntegridadSeccion['estado'] = valoresSecciones.some(
+    (s) => s.estado === 'discrepancias',
+  )
+    ? 'discrepancias'
+    : valoresSecciones.some((s) => s.estado === 'con_advertencias')
+      ? 'con_advertencias'
+      : 'verificada';
 
   await registrarLog({
     tipoEvento: 'verificacion_integridad',
