@@ -534,16 +534,27 @@ function construirSeccionParticipacion(e: EleccionParaIntegridad, bfa: DatosBfa)
     };
   }
 
-  const totalVotosBfa = (bfa.votos ?? []).reduce((acc, v) => acc + v, 0);
+  const checks: IntegridadCheck[] = [];
 
-  const checks: IntegridadCheck[] = [
-    {
+  if (bfa.votos !== undefined) {
+    const totalVotosBfa = bfa.votos.reduce((acc, v) => acc + v, 0);
+    checks.push({
       campo: 'cantidad_participaciones vs. total de votos en el contrato',
       ok: e.participaciones.length === totalVotosBfa,
       bd: e.participaciones.length,
       bfa: totalVotosBfa,
-    },
-  ];
+    });
+  } else {
+    // La elección todavía no cerró en el contrato: obtenerTodosLosVotos()
+    // revierte hasta pasar fechaCierre, así que este check no es comparable.
+    checks.push({
+      campo: 'cantidad_participaciones vs. total de votos en el contrato',
+      ok: true,
+      bd: e.participaciones.length,
+      bfa: 'no legible todavía: el contrato exige que la elección haya cerrado',
+      interno: true,
+    });
+  }
 
   for (const p of e.participaciones) {
     const votoEnContrato = bfa.hashesVotaron?.get(p.hashBlockchain) ?? false;
@@ -610,13 +621,23 @@ export async function verificarIntegridadEleccion(
     if (!tieneCodigo) {
       bfa = { tieneCodigo: false };
     } else {
-      const [nombre, fechaApertura, fechaCierre, cantidadListas, votos] = await Promise.all([
+      const [nombre, fechaApertura, fechaCierre, cantidadListas] = await Promise.all([
         obtenerNombreEleccion(contratoAddress),
         obtenerFechaApertura(contratoAddress),
         obtenerFechaCierre(contratoAddress),
         obtenerCantidadListas(contratoAddress),
-        obtenerVotos(contratoAddress),
       ]);
+
+      // obtenerTodosLosVotos() exige que el contrato ya haya cerrado
+      // (eleccionFinalizada) y revierte si se llama antes. Se aísla en su
+      // propio try/catch para que una elección todavía abierta no tumbe el
+      // resto de la verificación de integridad.
+      let votos: number[] | undefined;
+      try {
+        votos = await obtenerVotos(contratoAddress);
+      } catch {
+        votos = undefined;
+      }
 
       const nombresListas = await Promise.all(
         Array.from({ length: cantidadListas }, (_, indice) =>

@@ -1,8 +1,12 @@
 /**
  * ABI del contrato Votacion.sol realmente desplegado en BFA testnet.
  *
- * Corresponde a la version final en Solidity 0.5.4 + ABIEncoderV2
+ * Corresponde a la version final en Solidity 0.5.4 + EVM byzantium
  * (ver Informe de Despliegue, seccion 6.9 "Contrato final adaptado").
+ *
+ * votosPorLista paso de public a private: ya no genera un getter propio en
+ * el ABI. obtenerTodosLosVotos() ahora exige eleccionFinalizada (revierte
+ * si block.timestamp <= fechaCierre).
  *
  * Se mantiene como objeto tipado para que ethers.js infiera correctamente
  * los tipos de retorno.
@@ -79,15 +83,6 @@ export const VOTACION_ABI = [
   },
   {
     constant: true,
-    inputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-    name: 'votosPorLista',
-    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-    payable: false,
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    constant: true,
     inputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }],
     name: 'yaVoto',
     outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
@@ -129,6 +124,9 @@ export const VOTACION_ABI = [
     stateMutability: 'view',
     type: 'function',
   },
+  // Requiere eleccionFinalizada (block.timestamp > fechaCierre); revierte si se
+  // llama antes del cierre. votosPorLista ahora es private: ya no tiene
+  // getter propio, esta es la unica forma de leer los votos.
   {
     constant: true,
     inputs: [],
