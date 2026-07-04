@@ -1,0 +1,649 @@
+<title>Modelo de Datos — VotaciónFING</title>
+<style>
+  :root{
+    --bg:#eef2ee;
+    --surface:#ffffff;
+    --surface-2:#f5f8f4;
+    --ink:#191d1a;
+    --ink-dim:#5b655e;
+    --ink-faint:#8b9690;
+    --border:#d5ddd1;
+    --border-strong:#b7c2b2;
+    --accent:#1f6f54;
+    --accent-ink:#ffffff;
+    --accent-soft:#dcece3;
+    --cascade:#a9722e;
+    --cascade-soft:#f3e6d3;
+    --restrict:#2e5f8a;
+    --restrict-soft:#dde8f0;
+    --logical:#7a7f86;
+    --enum-bg:#e9e2f0;
+    --enum-ink:#4a3f63;
+    --shadow:0 1px 2px rgba(25,40,30,0.06), 0 6px 20px rgba(25,40,30,0.05);
+    --mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", monospace;
+    --sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  :root[data-theme="dark"]{
+    --bg:#11150f;
+    --surface:#171c16;
+    --surface-2:#1d2319;
+    --ink:#e7ede7;
+    --ink-dim:#9bab9c;
+    --ink-faint:#697468;
+    --border:#2b332a;
+    --border-strong:#3a4438;
+    --accent:#3fae82;
+    --accent-ink:#0b140f;
+    --accent-soft:#173b2b;
+    --cascade:#d79a4a;
+    --cascade-soft:#3a2c17;
+    --restrict:#7fb0dd;
+    --restrict-soft:#1c2c39;
+    --logical:#8a9089;
+    --enum-bg:#2a2438;
+    --enum-ink:#d8cfea;
+    --shadow:0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#11150f;
+      --surface:#171c16;
+      --surface-2:#1d2319;
+      --ink:#e7ede7;
+      --ink-dim:#9bab9c;
+      --ink-faint:#697468;
+      --border:#2b332a;
+      --border-strong:#3a4438;
+      --accent:#3fae82;
+      --accent-ink:#0b140f;
+      --accent-soft:#173b2b;
+      --cascade:#d79a4a;
+      --cascade-soft:#3a2c17;
+      --restrict:#7fb0dd;
+      --restrict-soft:#1c2c39;
+      --logical:#8a9089;
+      --enum-bg:#2a2438;
+      --enum-ink:#d8cfea;
+      --shadow:0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+  }
+  .page{
+    max-width:1320px;
+    margin:0 auto;
+    padding:48px 32px 80px;
+    display:flex;
+    flex-direction:column;
+    gap:36px;
+  }
+
+  /* ---------- Header ---------- */
+  header.top{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    padding-bottom:28px;
+    border-bottom:1px solid var(--border);
+  }
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:11.5px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--accent);
+    font-weight:600;
+  }
+  h1{
+    font-family:var(--mono);
+    font-size:clamp(22px,3vw,30px);
+    font-weight:700;
+    margin:0;
+    letter-spacing:-0.01em;
+    text-wrap:balance;
+  }
+  .sub{
+    font-size:14px;
+    color:var(--ink-dim);
+    max-width:62ch;
+    line-height:1.55;
+  }
+  .stats{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:6px;
+  }
+  .stat{
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--ink-dim);
+    background:var(--surface-2);
+    border:1px solid var(--border);
+    border-radius:5px;
+    padding:5px 10px;
+  }
+  .stat b{color:var(--ink); font-weight:700;}
+
+  /* ---------- Diagram ---------- */
+  .diagram-scroll{
+    overflow-x:auto;
+    overflow-y:visible;
+    border-radius:14px;
+    background:
+      linear-gradient(var(--surface-2) 1px, transparent 1px) 0 0/100% 34px,
+      linear-gradient(90deg, var(--surface-2) 1px, transparent 1px) 0 0/34px 100%,
+      var(--bg);
+    border:1px solid var(--border);
+    padding:8px;
+  }
+  .diagram{
+    position:relative;
+    min-width:1220px;
+    display:grid;
+    grid-template-columns:230px 230px 230px 230px;
+    grid-auto-rows:min-content;
+    column-gap:96px;
+    row-gap:110px;
+    padding:56px 44px;
+  }
+  svg.wires{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    overflow:visible;
+    pointer-events:none;
+  }
+  .wire-label{
+    font-family:var(--mono);
+    font-size:10.5px;
+    fill:var(--ink-dim);
+  }
+  .wire-label tspan.rule-cascade{fill:var(--cascade); font-weight:700;}
+  .wire-label tspan.rule-restrict{fill:var(--restrict); font-weight:700;}
+  .wire-label tspan.rule-logical{fill:var(--logical); font-weight:700;}
+  .wire-tag{
+    fill:var(--surface);
+  }
+  path.wire{
+    fill:none;
+    stroke-width:1.6;
+    transition:opacity .15s ease, stroke-width .15s ease;
+  }
+  path.wire.rule-cascade{ stroke:var(--cascade); }
+  path.wire.rule-restrict{ stroke:var(--restrict); }
+  path.wire.rule-logical{ stroke:var(--logical); stroke-dasharray:3 4; }
+  .wire-end circle{ transition:opacity .15s ease; }
+  .diagram.has-focus path.wire{ opacity:0.15; }
+  .diagram.has-focus path.wire.is-lit{ opacity:1; stroke-width:2.4; }
+  .diagram.has-focus .wire-end.is-dim circle{ opacity:0.15; }
+  .diagram.has-focus .wire-label.is-dim{ opacity:0.15; }
+
+  /* ---------- Entity cards ---------- */
+  .entity{
+    position:relative;
+    background:var(--surface);
+    border:1px solid var(--border-strong);
+    border-radius:10px;
+    box-shadow:var(--shadow);
+    z-index:2;
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .entity.is-standalone{
+    border-style:dashed;
+    border-color:var(--border-strong);
+  }
+  .entity.is-active{
+    border-color:var(--accent);
+  }
+  .entity__head{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:8px;
+    padding:10px 14px;
+    background:var(--surface-2);
+    border-bottom:1px solid var(--border);
+    border-radius:9px 9px 0 0;
+  }
+  .entity__name{
+    font-family:var(--mono);
+    font-weight:700;
+    font-size:13.5px;
+    letter-spacing:0.02em;
+    text-transform:uppercase;
+  }
+  .entity__table{
+    font-family:var(--mono);
+    font-size:10.5px;
+    color:var(--ink-faint);
+  }
+  .entity__fields{
+    list-style:none;
+    margin:0;
+    padding:6px 0;
+  }
+  .field{
+    display:grid;
+    grid-template-columns:26px 1fr;
+    align-items:baseline;
+    gap:8px;
+    padding:3.5px 14px;
+    font-family:var(--mono);
+    font-size:12px;
+  }
+  .field__key{
+    font-size:9.5px;
+    font-weight:700;
+    letter-spacing:0.02em;
+    text-align:center;
+    padding:1px 0;
+    border-radius:4px;
+    color:var(--ink-faint);
+  }
+  .field__key.pk{ background:var(--accent); color:var(--accent-ink); }
+  .field__key.fk{ background:transparent; color:var(--restrict); border:1px solid var(--restrict); }
+  .field__key.uk{ background:transparent; color:var(--ink-dim); border:1px solid var(--border-strong); }
+  .field__row{ display:flex; flex-wrap:wrap; column-gap:6px; row-gap:2px; align-items:baseline; }
+  .field__name{ color:var(--ink); }
+  .field__type{ color:var(--ink-faint); }
+  .field__default{ color:var(--ink-faint); font-style:italic; }
+  .field.is-fk .field__name{ color:var(--restrict); }
+  .enum-chip{
+    background:var(--enum-bg);
+    color:var(--enum-ink);
+    border-radius:4px;
+    padding:0 5px;
+    font-size:10.5px;
+  }
+  .entity__note{
+    border-top:1px solid var(--border);
+    padding:7px 14px 10px;
+    font-family:var(--sans);
+    font-size:11px;
+    color:var(--ink-dim);
+    line-height:1.45;
+  }
+  .entity__note code{
+    font-family:var(--mono);
+    font-size:10.5px;
+    background:var(--surface-2);
+    padding:0 4px;
+    border-radius:3px;
+  }
+
+  /* ---------- Legend & enums ---------- */
+  .below{
+    display:grid;
+    grid-template-columns:1.1fr 1fr;
+    gap:28px;
+    align-items:start;
+  }
+  @media (max-width:880px){ .below{ grid-template-columns:1fr; } }
+  .panel{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:20px 22px;
+  }
+  .panel h2{
+    font-family:var(--mono);
+    font-size:11.5px;
+    text-transform:uppercase;
+    letter-spacing:0.12em;
+    color:var(--ink-dim);
+    margin:0 0 14px;
+  }
+  .legend-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px 20px;
+  }
+  .legend-item{ display:flex; align-items:flex-start; gap:10px; font-size:12.5px; color:var(--ink-dim); }
+  .legend-swatch{ flex:0 0 auto; margin-top:3px; }
+  .legend-item b{ color:var(--ink); font-weight:600; }
+  .legend-line{ width:26px; height:0; border-top:2.4px solid; margin-top:7px; }
+  .legend-line.cascade{ border-color:var(--cascade); }
+  .legend-line.restrict{ border-color:var(--restrict); }
+  .legend-line.logical{ border-color:var(--logical); border-top-style:dashed; }
+  .legend-badge{
+    font-family:var(--mono); font-size:9.5px; font-weight:700;
+    border-radius:4px; padding:1px 6px; line-height:1.5;
+  }
+  .legend-badge.pk{ background:var(--accent); color:var(--accent-ink); }
+  .legend-badge.fk{ border:1px solid var(--restrict); color:var(--restrict); }
+  .legend-badge.uk{ border:1px solid var(--border-strong); color:var(--ink-dim); }
+
+  .enum-list{ display:flex; flex-direction:column; gap:14px; }
+  .enum-block .enum-name{
+    font-family:var(--mono); font-size:12.5px; font-weight:700; color:var(--ink);
+  }
+  .enum-values{
+    margin-top:6px; display:flex; flex-wrap:wrap; gap:6px;
+  }
+  .enum-values span{
+    font-family:var(--mono); font-size:10.5px;
+    background:var(--enum-bg); color:var(--enum-ink);
+    border-radius:4px; padding:2px 7px;
+  }
+
+  footer.foot{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--ink-faint);
+    text-align:center;
+    padding-top:8px;
+  }
+</style>
+
+<div class="page">
+
+  <header class="top">
+    <span class="eyebrow">VotaciónFING · esquema de base de datos</span>
+    <h1>Diagrama entidad‑relación</h1>
+    <p class="sub">Modelo relacional (PostgreSQL vía Prisma) del sistema de votación electrónica de FING. Refleja <code style="font-family:var(--mono); font-size:12.5px;">schema.prisma</code> tal como está: tipos, nulabilidad, claves y reglas de borrado.</p>
+    <div class="stats">
+      <span class="stat"><b>7</b> tablas</span>
+      <span class="stat"><b>5</b> relaciones FK</span>
+      <span class="stat"><b>1</b> referencia lógica</span>
+      <span class="stat"><b>4</b> enums</span>
+      <span class="stat"><b>2</b> tablas sin relaciones (Administrador, Log)</span>
+    </div>
+  </header>
+
+  <div class="diagram-scroll">
+    <div class="diagram" id="diagram">
+      <svg class="wires" id="wires"></svg>
+
+      <!-- Row 1 -->
+      <div class="entity is-standalone" id="ent-administrador" style="grid-column:1; grid-row:1;">
+        <div class="entity__head"><span class="entity__name">Administrador</span><span class="entity__table">administrador</span></div>
+        <ul class="entity__fields">
+          <li class="field"><span class="field__key pk">PK</span><span class="field__row"><span class="field__name">id</span><span class="field__type">Int</span></span></li>
+          <li class="field"><span class="field__key uk">UK</span><span class="field__row"><span class="field__name">correo</span><span class="field__type">String @db.VarChar(100)</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">passwordHash</span><span class="field__type">String @db.VarChar(255)</span></span></li>
+        </ul>
+        <div class="entity__note">Sin relaciones declaradas. Registro único o pocos, cargado directo en la BD.</div>
+      </div>
+
+      <div class="entity" id="ent-eleccion" style="grid-column:3; grid-row:1;">
+        <div class="entity__head"><span class="entity__name">Eleccion</span><span class="entity__table">eleccion</span></div>
+        <ul class="entity__fields">
+          <li class="field"><span class="field__key pk">PK</span><span class="field__row"><span class="field__name">id</span><span class="field__type">Int</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">nombre</span><span class="field__type">String @db.VarChar(150)</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">fechaInicio</span><span class="field__type">DateTime</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">fechaCierre</span><span class="field__type">DateTime</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">contratoAddress</span><span class="field__type">String? @db.VarChar(42)</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">estado</span><span class="enum-chip">EstadoEleccion</span><span class="field__default">= creada</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">createdAt</span><span class="field__type">DateTime</span><span class="field__default">= now()</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">totalVotos</span><span class="field__type">Int?</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">resultadoTipo</span><span class="enum-chip">ResultadoTipo?</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">idListaGanadora</span><span class="field__type">Int?</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">snapshotAt</span><span class="field__type">DateTime?</span></span></li>
+        </ul>
+        <div class="entity__note">Campos de snapshot (<code>totalVotos</code>…<code>snapshotAt</code>) se completan recién al finalizar y tomar el resultado de BFA. <code>idListaGanadora</code> apunta a Lista.id pero no es FK real en Prisma.</div>
+      </div>
+
+      <div class="entity is-standalone" id="ent-log" style="grid-column:4; grid-row:1;">
+        <div class="entity__head"><span class="entity__name">Log</span><span class="entity__table">log</span></div>
+        <ul class="entity__fields">
+          <li class="field"><span class="field__key pk">PK</span><span class="field__row"><span class="field__name">id</span><span class="field__type">Int</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">tipoEvento</span><span class="enum-chip">TipoEvento</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">descripcion</span><span class="field__type">String? @db.Text</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">idUsuario</span><span class="field__type">Int?</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">rolUsuario</span><span class="enum-chip">RolUsuario</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">timestamp</span><span class="field__type">DateTime</span><span class="field__default">= now()</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">ip</span><span class="field__type">String? @db.VarChar(45)</span></span></li>
+        </ul>
+        <div class="entity__note"><code>idUsuario</code> es intencionalmente sin FK: identifica votante, admin o sistema (login, cron) según <code>rolUsuario</code>. Nunca guarda contraseñas.</div>
+      </div>
+
+      <!-- Row 2 -->
+      <div class="entity" id="ent-votante" style="grid-column:1; grid-row:2;">
+        <div class="entity__head"><span class="entity__name">Votante</span><span class="entity__table">votante</span></div>
+        <ul class="entity__fields">
+          <li class="field"><span class="field__key pk">PK</span><span class="field__row"><span class="field__name">id</span><span class="field__type">Int</span></span></li>
+          <li class="field"><span class="field__key uk">UK</span><span class="field__row"><span class="field__name">legajo</span><span class="field__type">String @db.VarChar(20)</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">nombreCompleto</span><span class="field__type">String @db.VarChar(150)</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">carrera</span><span class="field__type">String @db.VarChar(100)</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">correo</span><span class="field__type">String @db.VarChar(100)</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">passwordHash</span><span class="field__type">String @db.VarChar(255)</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">activo</span><span class="field__type">Boolean</span><span class="field__default">= true</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">createdAt</span><span class="field__type">DateTime</span><span class="field__default">= now()</span></span></li>
+        </ul>
+        <div class="entity__note">Se carga directo en la BD: la app no tiene alta de votantes.</div>
+      </div>
+
+      <div class="entity" id="ent-participacion" style="grid-column:2; grid-row:2;">
+        <div class="entity__head"><span class="entity__name">Participacion</span><span class="entity__table">participacion</span></div>
+        <ul class="entity__fields">
+          <li class="field"><span class="field__key pk">PK</span><span class="field__row"><span class="field__name">id</span><span class="field__type">Int</span></span></li>
+          <li class="field is-fk"><span class="field__key fk">FK</span><span class="field__row"><span class="field__name">idVotante</span><span class="field__type">Int</span></span></li>
+          <li class="field is-fk"><span class="field__key fk">FK</span><span class="field__row"><span class="field__name">idEleccion</span><span class="field__type">Int</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">fechaVoto</span><span class="field__type">DateTime</span><span class="field__default">= now()</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">hashBlockchain</span><span class="field__type">String @db.VarChar(255)</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">txHash</span><span class="field__type">String @db.VarChar(255)</span></span></li>
+        </ul>
+        <div class="entity__note"><b style="color:var(--ink)">UK</b> compuesta <code>(idVotante, idEleccion)</code> — evita doble voto. Deliberadamente <b style="color:var(--ink)">sin FK hacia Lista</b>: preserva el anonimato de a quién se votó.</div>
+      </div>
+
+      <div class="entity" id="ent-lista" style="grid-column:3; grid-row:2;">
+        <div class="entity__head"><span class="entity__name">Lista</span><span class="entity__table">lista</span></div>
+        <ul class="entity__fields">
+          <li class="field"><span class="field__key pk">PK</span><span class="field__row"><span class="field__name">id</span><span class="field__type">Int</span></span></li>
+          <li class="field is-fk"><span class="field__key fk">FK</span><span class="field__row"><span class="field__name">idEleccion</span><span class="field__type">Int</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">nombre</span><span class="field__type">String @db.VarChar(100)</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">esBlanco</span><span class="field__type">Boolean</span><span class="field__default">= false</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">indice</span><span class="field__type">Int</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">color</span><span class="field__type">String? @db.VarChar(7)</span></span></li>
+        </ul>
+        <div class="entity__note"><b style="color:var(--ink)">UK</b> <code>(idEleccion, nombre)</code> y <code>(idEleccion, indice)</code>. <code>indice</code> debe calzar con la posición del array pasado al contrato.</div>
+      </div>
+
+      <div class="entity" id="ent-resultado" style="grid-column:4; grid-row:2;">
+        <div class="entity__head"><span class="entity__name">Resultado</span><span class="entity__table">resultado</span></div>
+        <ul class="entity__fields">
+          <li class="field"><span class="field__key pk">PK</span><span class="field__row"><span class="field__name">id</span><span class="field__type">Int</span></span></li>
+          <li class="field is-fk"><span class="field__key fk">FK</span><span class="field__row"><span class="field__name">idEleccion</span><span class="field__type">Int</span></span></li>
+          <li class="field is-fk"><span class="field__key fk">FK</span><span class="field__row"><span class="field__name">idLista</span><span class="field__type">Int</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">indice</span><span class="field__type">Int</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">votos</span><span class="field__type">Int</span></span></li>
+        </ul>
+        <div class="entity__note"><b style="color:var(--ink)">UK</b> <code>(idEleccion, idLista)</code>. Snapshot inmutable de votos por lista tomado del contrato en BFA al finalizar.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="below">
+    <div class="panel">
+      <h2>Cómo leer el diagrama</h2>
+      <div class="legend-grid">
+        <div class="legend-item"><span class="legend-badge pk">PK</span><span>Clave primaria (autoincrement)</span></div>
+        <div class="legend-item"><span class="legend-badge fk">FK</span><span>Clave foránea declarada en Prisma</span></div>
+        <div class="legend-item"><span class="legend-badge uk">UK</span><span>Único (simple o compuesto)</span></div>
+        <div class="legend-item"><span class="enum-chip" style="margin-top:1px;">Enum</span><span>Tipo enumerado de Postgres</span></div>
+        <div class="legend-item"><span class="legend-line cascade"></span><span><b>ON DELETE CASCADE</b> — borra en cadena</span></div>
+        <div class="legend-item"><span class="legend-line restrict"></span><span><b>ON DELETE RESTRICT</b> — bloquea el borrado si hay hijos</span></div>
+        <div class="legend-item"><span class="legend-line logical"></span><span><b>Referencia lógica</b> — sin FK real, solo por convención de la app</span></div>
+        <div class="legend-item"><span style="font-family:var(--mono); font-size:11px; color:var(--ink-dim);">1 ─● / ○─ N</span><span>Cardinalidad: extremo "1" (padre) y "N" (hijo)</span></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Enums</h2>
+      <div class="enum-list">
+        <div class="enum-block">
+          <span class="enum-name">EstadoEleccion</span>
+          <div class="enum-values"><span>creada</span><span>publicada</span><span>finalizada</span></div>
+        </div>
+        <div class="enum-block">
+          <span class="enum-name">ResultadoTipo</span>
+          <div class="enum-values"><span>ganador_unico</span><span>empate</span></div>
+        </div>
+        <div class="enum-block">
+          <span class="enum-name">RolUsuario</span>
+          <div class="enum-values"><span>votante</span><span>administrador</span><span>sistema</span></div>
+        </div>
+        <div class="enum-block">
+          <span class="enum-name">TipoEvento</span>
+          <div class="enum-values">
+            <span>login_exitoso</span><span>login_fallido</span><span>voto_emitido</span><span>voto_error</span>
+            <span>eleccion_creada</span><span>eleccion_editada</span><span>eleccion_eliminada</span>
+            <span>lista_creada</span><span>lista_editada</span><span>lista_eliminada</span>
+            <span>cierre_automatico</span><span>apertura_automatica</span><span>verificacion_integridad</span><span>sesion_cerrada</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="foot">generado a partir de votacion-backend/prisma/schema.prisma</footer>
+</div>
+
+<script>
+(function(){
+  var relations = [
+    { from:'lista',         to:'eleccion', field:'idEleccion',      rule:'cascade',  cardFrom:'N', cardTo:'1' },
+    { from:'participacion', to:'eleccion', field:'idEleccion',      rule:'restrict', cardFrom:'N', cardTo:'1' },
+    { from:'resultado',     to:'eleccion', field:'idEleccion',      rule:'cascade',  cardFrom:'N', cardTo:'1' },
+    { from:'resultado',     to:'lista',    field:'idLista',         rule:'cascade',  cardFrom:'N', cardTo:'1' },
+    { from:'participacion', to:'votante',  field:'idVotante',       rule:'restrict', cardFrom:'N', cardTo:'1' },
+    { from:'eleccion',      to:'lista',    field:'idListaGanadora', rule:'logical',  cardFrom:'?', cardTo:'1' }
+  ];
+
+  var diagram = document.getElementById('diagram');
+  var svg = document.getElementById('wires');
+  var entities = {};
+  document.querySelectorAll('.entity').forEach(function(el){ entities[el.id.replace('ent-','')] = el; });
+
+  function edgePoint(rect, cx, cy, tx, ty){
+    var dx = tx - cx, dy = ty - cy;
+    if (dx === 0 && dy === 0) return { x: cx, y: cy };
+    var halfW = rect.width/2, halfH = rect.height/2;
+    var scaleX = dx !== 0 ? halfW/Math.abs(dx) : Infinity;
+    var scaleY = dy !== 0 ? halfH/Math.abs(dy) : Infinity;
+    var scale = Math.min(scaleX, scaleY);
+    return { x: cx + dx*scale, y: cy + dy*scale };
+  }
+
+  function pairKey(a,b){ return [a,b].sort().join('__'); }
+
+  function draw(){
+    var containerRect = diagram.getBoundingClientRect();
+    svg.innerHTML = '';
+    var ns = 'http://www.w3.org/2000/svg';
+    var defs = document.createElementNS(ns,'defs');
+    ['cascade','restrict','logical'].forEach(function(rule){
+      var marker = document.createElementNS(ns,'marker');
+      marker.setAttribute('id','arrow-'+rule);
+      marker.setAttribute('markerWidth','8');
+      marker.setAttribute('markerHeight','8');
+      marker.setAttribute('refX','6.5');
+      marker.setAttribute('refY','4');
+      marker.setAttribute('orient','auto');
+      var tri = document.createElementNS(ns,'path');
+      tri.setAttribute('d','M0,0 L8,4 L0,8 Z');
+      tri.setAttribute('fill', getComputedStyle(document.documentElement).getPropertyValue('--'+rule).trim());
+      marker.appendChild(tri);
+      defs.appendChild(marker);
+    });
+    svg.appendChild(defs);
+
+    var seenPairs = {};
+
+    relations.forEach(function(rel){
+      var fromEl = entities[rel.from], toEl = entities[rel.to];
+      if (!fromEl || !toEl) return;
+      var fr = fromEl.getBoundingClientRect(), tr = toEl.getBoundingClientRect();
+      var fcx = fr.left + fr.width/2 - containerRect.left, fcy = fr.top + fr.height/2 - containerRect.top;
+      var tcx = tr.left + tr.width/2 - containerRect.left, tcy = tr.top + tr.height/2 - containerRect.top;
+
+      var key = pairKey(rel.from, rel.to);
+      var n = seenPairs[key] || 0;
+      seenPairs[key] = n + 1;
+
+      var p1 = edgePoint({width:fr.width,height:fr.height}, fcx, fcy, tcx, tcy);
+      var p2 = edgePoint({width:tr.width,height:tr.height}, tcx, tcy, fcx, fcy);
+
+      var mx = (p1.x+p2.x)/2, my=(p1.y+p2.y)/2;
+      var offset = n === 0 ? 0 : (n % 2 === 1 ? 62 : -62) * Math.ceil(n/2);
+      var dx = p2.x-p1.x, dy = p2.y-p1.y, len = Math.sqrt(dx*dx+dy*dy) || 1;
+      var nx = -dy/len, ny = dx/len;
+      var cx = mx + nx*offset, cy = my + ny*offset;
+      var labelY = cy - 6 + (n === 0 ? 0 : -16);
+
+      var path = document.createElementNS(ns,'path');
+      var d = (offset === 0)
+        ? 'M '+p1.x+','+p1.y+' L '+p2.x+','+p2.y
+        : 'M '+p1.x+','+p1.y+' Q '+cx+','+cy+' '+p2.x+','+p2.y;
+      path.setAttribute('d', d);
+      path.setAttribute('class', 'wire rule-'+rel.rule);
+      path.setAttribute('marker-end', 'url(#arrow-'+rel.rule+')');
+      path.dataset.from = rel.from;
+      path.dataset.to = rel.to;
+      svg.appendChild(path);
+
+      // cardinality end marks
+      [{pt:p1, label:rel.cardFrom, entity:rel.from}, {pt:p2, label:rel.cardTo, entity:rel.to}].forEach(function(end){
+        var g = document.createElementNS(ns,'g');
+        g.setAttribute('class','wire-end');
+        g.dataset.from = rel.from; g.dataset.to = rel.to;
+        var txt = document.createElementNS(ns,'text');
+        var along = end.pt === p1 ? {x:p1.x+(cx-p1.x)*0.28, y:p1.y+(cy-p1.y)*0.28} : {x:p2.x+(cx-p2.x)*0.28, y:p2.y+(cy-p2.y)*0.28};
+        txt.setAttribute('x', along.x + (end.pt===p1? 8:-8));
+        txt.setAttribute('y', along.y - 6);
+        txt.setAttribute('class','wire-label');
+        txt.setAttribute('text-anchor', end.pt===p1 ? 'start':'end');
+        txt.textContent = end.label;
+        g.appendChild(txt);
+        svg.appendChild(g);
+      });
+
+      // field label at the curve midpoint, colored by delete rule
+      var labelText = document.createElementNS(ns,'text');
+      labelText.setAttribute('x', cx);
+      labelText.setAttribute('y', labelY);
+      labelText.setAttribute('text-anchor','middle');
+      labelText.setAttribute('class','wire-label');
+      var ruleClass = 'rule-'+rel.rule;
+      labelText.innerHTML = '<tspan class="'+ruleClass+'">'+rel.field+'</tspan>';
+      svg.appendChild(labelText);
+    });
+  }
+
+  draw();
+  window.addEventListener('resize', draw);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
+  new ResizeObserver(draw).observe(diagram);
+
+  // hover focus
+  document.querySelectorAll('.entity').forEach(function(el){
+    var id = el.id.replace('ent-','');
+    el.addEventListener('mouseenter', function(){
+      diagram.classList.add('has-focus');
+      el.classList.add('is-active');
+      svg.querySelectorAll('.wire, .wire-end, .wire-label').forEach(function(w){
+        var isRelated = w.dataset && (w.dataset.from === id || w.dataset.to === id);
+        if (w.classList.contains('wire') || w.classList.contains('wire-label')){
+          if (isRelated) w.classList.add('is-lit'); else w.classList.add('is-dim');
+        } else if (w.classList.contains('wire-end')) {
+          if (!isRelated) w.classList.add('is-dim');
+        }
+      });
+    });
+    el.addEventListener('mouseleave', function(){
+      diagram.classList.remove('has-focus');
+      el.classList.remove('is-active');
+      svg.querySelectorAll('.is-lit, .is-dim').forEach(function(w){ w.classList.remove('is-lit'); w.classList.remove('is-dim'); });
+    });
+  });
+})();
+</script>
