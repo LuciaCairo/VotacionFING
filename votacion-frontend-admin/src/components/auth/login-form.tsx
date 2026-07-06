@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginAdminSchema, type LoginAdminInput } from "@/lib/validations/auth";
 import { classifyLoginError, useLoginAdmin } from "@/hooks/use-login";
-import { getAdminSession, saveAdminSession } from "@/lib/auth/session";
+import { saveAdminSession, useAdminSession } from "@/lib/auth/session";
 import { LoginBanner } from "./login-banner";
 
 /** A dónde redirigir tras un login exitoso. */
@@ -28,6 +28,7 @@ const DEV_ADMIN_CREDENTIALS: LoginAdminInput = {
 export function LoginForm() {
   const router = useRouter();
   const mutation = useLoginAdmin();
+  const existingSession = useAdminSession();
   const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
@@ -48,11 +49,13 @@ export function LoginForm() {
   const isFormDisabled = isPending || isLocked || isSuccess;
 
   // Si ya hay una sesión de administrador guardada, no tiene sentido mostrar
-  // el formulario de login: mandamos directo al panel.
+  // el formulario de login: mandamos directo al panel. `existingSession` es
+  // reactivo (useSyncExternalStore), así que el chequeo también gatea el
+  // render más abajo y evita que el formulario llegue a verse un instante
+  // antes de redirigir.
   useEffect(() => {
-    if (getAdminSession()) router.replace(POST_LOGIN_REDIRECT);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (existingSession) router.replace(POST_LOGIN_REDIRECT);
+  }, [existingSession, router]);
 
   // Al loguear con éxito: persistimos la sesión y, tras la animación,
   // redirigimos al panel.
@@ -99,6 +102,19 @@ export function LoginForm() {
     setValue("correo", DEV_ADMIN_CREDENTIALS.correo);
     setValue("password", DEV_ADMIN_CREDENTIALS.password);
     handleSubmit(onSubmit)();
+  }
+
+  if (existingSession) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+        <span
+          className="h-8 w-8 animate-spin-fast rounded-full border-[3px] border-[#cfe6f9]"
+          style={{ borderTopColor: "#1f8fe0" }}
+          aria-hidden="true"
+        />
+        <p className="text-sm text-[#5b6b7c]">Redirigiendo al panel...</p>
+      </div>
+    );
   }
 
   if (isSuccess) {
