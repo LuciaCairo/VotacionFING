@@ -90,6 +90,52 @@ export async function listarEleccionesAgrupadas(): Promise<EleccionesAgrupadas> 
   return agrupadas;
 }
 
+// ─── GET /api/admin/elecciones/:id ───────────────────────────
+
+/**
+ * Devuelve el detalle de una elección para el admin: a diferencia de
+ * GET /api/votante/elecciones/:id, no calcula ya_voto (no hay votante) y
+ * sí puede devolver elecciones en estado "creada" — el admin necesita ver
+ * el detalle de lo que todavía no publicó.
+ */
+export async function obtenerDetalleEleccionAdmin(eleccionId: number) {
+  const eleccion = await prisma.eleccion.findUnique({
+    where: { id: eleccionId },
+    select: {
+      id: true,
+      nombre: true,
+      fechaInicio: true,
+      fechaCierre: true,
+      estado: true,
+      contratoAddress: true,
+      listas: {
+        orderBy: { indice: 'asc' },
+        select: { id: true, nombre: true, esBlanco: true, indice: true, color: true },
+      },
+    },
+  });
+
+  if (!eleccion) {
+    throw new NoEncontradoError(`No existe una elección con id ${eleccionId}.`);
+  }
+
+  return {
+    id: eleccion.id,
+    nombre: eleccion.nombre,
+    fecha_inicio: eleccion.fechaInicio.toISOString(),
+    fecha_cierre: eleccion.fechaCierre.toISOString(),
+    estado: eleccion.estado,
+    contrato_address: eleccion.contratoAddress,
+    listas: eleccion.listas.map((l) => ({
+      id: l.id,
+      nombre: l.nombre,
+      es_blanco: l.esBlanco,
+      indice: l.indice,
+      color: l.color,
+    })),
+  };
+}
+
 // ─── GET /api/admin/padron ───────────────────────────────────
 
 /**

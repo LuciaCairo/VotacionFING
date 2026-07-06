@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import {
   listarEleccionesAgrupadas,
+  obtenerDetalleEleccionAdmin,
   crearEleccion,
   eliminarEleccion,
   listarPadron,
@@ -40,6 +41,13 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   // ─── GET /api/admin/elecciones ──────────────────────────────
   app.get('/elecciones', { preHandler: soloAdmin }, async (_req, reply) => {
     const resultado = await listarEleccionesAgrupadas();
+    return reply.code(200).send(resultado);
+  });
+
+  // ─── GET /api/admin/elecciones/:id ───────────────────────────
+  app.get('/elecciones/:id', { preHandler: soloAdmin }, async (req, reply) => {
+    const { id } = eleccionIdParamSchema.parse(req.params);
+    const resultado = await obtenerDetalleEleccionAdmin(id);
     return reply.code(200).send(resultado);
   });
 
