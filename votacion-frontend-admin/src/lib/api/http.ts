@@ -70,3 +70,11 @@ export function getJson<TResponse>(path: string): Promise<TResponse> {
     headers: { ...getAuthHeader() },
   });
 }
+
+/** DELETE autenticado: adjunta el header `Authorization` de la sesión guardada. */
+export function deleteJson<TResponse>(path: string): Promise<TResponse> {
+  return request<TResponse>(path, {
+    method: "DELETE",
+    headers: { ...getAuthHeader() },
+  });
+}
