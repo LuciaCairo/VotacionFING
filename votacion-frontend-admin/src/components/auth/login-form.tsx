@@ -9,8 +9,8 @@ import { classifyLoginError, useLoginAdmin } from "@/hooks/use-login";
 import { getAdminSession, saveAdminSession } from "@/lib/auth/session";
 import { LoginBanner } from "./login-banner";
 
-/** A dónde redirigir tras un login exitoso (todavía no existe la home real del panel). */
-const POST_LOGIN_REDIRECT = "/";
+/** A dónde redirigir tras un login exitoso. */
+const POST_LOGIN_REDIRECT = "/admin";
 /** Tiempo que se muestra la animación de éxito antes de redirigir. */
 const SUCCESS_REDIRECT_DELAY_MS = 1400;
 

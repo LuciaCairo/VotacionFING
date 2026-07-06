@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Image from "next/image";
+import { FacultadLogo } from "@/components/brand/facultad-logo";
 import { LoginForm } from "@/components/auth/login-form";
 
 export const metadata: Metadata = {
@@ -15,7 +15,9 @@ export default function LoginPage() {
           <div className="pointer-events-none absolute top-[-60px] right-[-60px] h-[220px] w-[220px] rounded-full border border-white/[0.08]" />
           <div className="pointer-events-none absolute right-[-20px] bottom-[-80px] h-[260px] w-[260px] rounded-full border border-white/[0.06]" />
 
-          <FacultadLogo />
+          <div className="z-10 h-[84px] w-[75%]">
+            <FacultadLogo className="h-full w-auto object-contain" />
+          </div>
 
           <div className="z-10 mt-6 md:mt-8">
             <div className="text-[28px] leading-[1.15] font-extrabold tracking-[-0.5px] text-white md:text-[32px]">
@@ -40,21 +42,6 @@ export default function LoginPage() {
           <LoginForm />
         </div>
       </div>
-    </div>
-  );
-}
-
-function FacultadLogo() {
-  return (
-    <div className="z-10 h-[84px] w-[75%]">
-      <Image
-        src="/logo-fing.png"
-        alt="Facultad de Ingeniería"
-        width={264}
-        height={90}
-        priority
-        className="h-full w-auto object-contain"
-      />
     </div>
   );
 }
