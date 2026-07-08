@@ -1,21 +1,43 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { ElectionCard } from "@/components/admin/election-card";
 import { EmptyElectionsState } from "@/components/admin/empty-state";
 import { useElecciones } from "@/hooks/use-elecciones";
 import { useLogout } from "@/hooks/use-logout";
-import { SECCION_LABELS, type Seccion } from "@/lib/api/elecciones";
+import { SECCION_LABELS, SECCIONES, type Seccion } from "@/lib/api/elecciones";
 import { ApiError } from "@/lib/api/errors";
 import { clearAdminSession } from "@/lib/auth/session";
 
+function esSeccion(valor: string | null): valor is Seccion {
+  return SECCIONES.includes(valor as Seccion);
+}
+
+/**
+ * `useSearchParams` obliga a un límite de Suspense para no bloquear el
+ * prerender estático de esta ruta (ver docs de Next.js). El fallback nunca
+ * se llega a ver en la práctica: en desarrollo no suspende, y en producción
+ * la navegación desde el detalle de una elección siempre es client-side.
+ */
 export default function AdminHomePage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminHomeContent />
+    </Suspense>
+  );
+}
+
+function AdminHomeContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const logout = useLogout();
   const query = useElecciones();
-  const [activeSeccion, setActiveSeccion] = useState<Seccion>("creada");
+  const seccionInicial = searchParams.get("seccion");
+  const [activeSeccion, setActiveSeccion] = useState<Seccion>(
+    esSeccion(seccionInicial) ? seccionInicial : "creada",
+  );
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // Sesión expirada del lado del servidor (401 en /api/admin/elecciones):

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { EliminarEleccionDialog } from "@/components/admin/eleccion/eliminar-eleccion-dialog";
-import { EstadoCreadaCard } from "@/components/admin/eleccion/estado-creada-card";
+import { EstadoEleccionCard } from "@/components/admin/eleccion/estado-eleccion-card";
 import { FechaCard } from "@/components/admin/eleccion/fecha-card";
 import { ListaRow } from "@/components/admin/eleccion/lista-row";
 import { useEleccionDetalle } from "@/hooks/use-eleccion-detalle";
@@ -49,7 +49,7 @@ export default function EleccionDetallePage() {
           <div className="flex items-center gap-3.5">
             <button
               type="button"
-              onClick={() => router.push("/admin")}
+              onClick={() => router.push(rutaVolverAlPanel(query.data?.estado))}
               aria-label="Volver al panel de elecciones"
               className="flex size-[38px] shrink-0 items-center justify-center rounded-[10px] text-[#0a2540] transition-colors hover:bg-black/[0.05]"
             >
@@ -90,8 +90,10 @@ export default function EleccionDetallePage() {
             />
           ) : query.isPending || sesionExpirada ? (
             <DetalleSkeleton />
-          ) : query.isSuccess && query.data.estado === "creada" ? (
-            <EleccionCreadaDetalle eleccion={query.data} />
+          ) : query.isSuccess &&
+            (query.data.estado === "creada" ||
+              query.data.estado === "publicada") ? (
+            <EleccionDetalleLayout eleccion={query.data} />
           ) : query.isSuccess ? (
             <EstadoNoDisponible eleccion={query.data} />
           ) : null}
@@ -101,7 +103,7 @@ export default function EleccionDetallePage() {
   );
 }
 
-function EleccionCreadaDetalle({ eleccion }: { eleccion: EleccionDetalleDTO }) {
+function EleccionDetalleLayout({ eleccion }: { eleccion: EleccionDetalleDTO }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="mb-7 grid shrink-0 grid-cols-1 gap-4 sm:grid-cols-2">
@@ -133,7 +135,7 @@ function EleccionCreadaDetalle({ eleccion }: { eleccion: EleccionDetalleDTO }) {
           >
             LISTAS PARTICIPANTES
           </div>
-          <EstadoCreadaCard eleccion={eleccion} />
+          <EstadoEleccionCard eleccion={eleccion} />
         </div>
       </div>
     </div>
@@ -141,10 +143,10 @@ function EleccionCreadaDetalle({ eleccion }: { eleccion: EleccionDetalleDTO }) {
 }
 
 /**
- * Placeholder neutro para elecciones "publicada"/"finalizada": el diseño de
- * esa card todavía no existe (ver brief). El Home ya no linkea acá para esos
- * estados (usa /integridad y /resultados), así que esta rama solo se pisa
- * con una URL escrita a mano.
+ * Placeholder neutro para elecciones "finalizada": el diseño de esa card
+ * todavía no existe (ver brief). El Home ya no linkea acá para ese estado
+ * (usa /resultados), así que esta rama solo se pisa con una URL escrita a
+ * mano.
  */
 function EstadoNoDisponible({ eleccion }: { eleccion: EleccionDetalleDTO }) {
   return (
@@ -155,13 +157,18 @@ function EstadoNoDisponible({ eleccion }: { eleccion: EleccionDetalleDTO }) {
         &quot; todavía no está disponible.
       </p>
       <Link
-        href="/admin"
+        href={rutaVolverAlPanel(eleccion.estado)}
         className="mt-4 inline-block rounded-full bg-[#1f8fe0] px-5 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#1a7cc4]"
       >
         Volver al panel
       </Link>
     </div>
   );
+}
+
+/** Ruta al Home, en la sección correspondiente al estado de la elección. */
+function rutaVolverAlPanel(estado?: EleccionDetalleDTO["estado"]): string {
+  return estado ? `/admin?seccion=${estado}` : "/admin";
 }
 
 function DetalleSkeleton() {

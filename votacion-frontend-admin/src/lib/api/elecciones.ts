@@ -51,7 +51,7 @@ export function rutaVerEleccion(seccion: Seccion, id: number): string {
     case "creada":
       return `/admin/elecciones/${id}`;
     case "publicada":
-      return `/admin/elecciones/${id}/integridad`;
+      return `/admin/elecciones/${id}`;
     case "finalizada":
       return `/admin/elecciones/${id}/resultados`;
   }
