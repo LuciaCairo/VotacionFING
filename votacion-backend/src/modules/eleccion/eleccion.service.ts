@@ -32,6 +32,8 @@ export async function obtenerResultados(eleccionId: number) {
           id: true,
           nombre: true,
           esBlanco: true,
+          indice: true,
+          color: true,
           resultados: { select: { votos: true } },
         },
       },
@@ -58,6 +60,8 @@ export async function obtenerResultados(eleccionId: number) {
   const listasConVotos = eleccion.listas.map((l) => ({
     nombre: l.nombre,
     esBlanco: l.esBlanco,
+    indice: l.indice,
+    color: l.color,
     votos: l.resultados[0]?.votos ?? 0,
   }));
 
@@ -66,6 +70,8 @@ export async function obtenerResultados(eleccionId: number) {
   const listas = listasConVotos.map((l) => ({
     nombre: l.nombre,
     es_blanco: l.esBlanco,
+    indice: l.indice,
+    color: l.color,
     votos: l.votos,
     porcentaje: totalVotos > 0 ? redondear((l.votos / totalVotos) * 100) : 0,
   }));

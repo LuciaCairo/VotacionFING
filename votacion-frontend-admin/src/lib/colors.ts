@@ -25,6 +25,21 @@ export function colorDeLista(color: string | null, indice: number): string {
  * fijo, hay que decidir el contraste según el brillo real del color de
  * fondo (luminancia relativa, no un promedio simple de RGB).
  */
+/**
+ * Color de swatch/barra para una lista en la pantalla de Resultados. El voto
+ * en blanco tiene color fijo #FFFFFF en BD (ver arriba), que sería invisible
+ * como swatch o relleno de barra sobre las cards blancas de esa pantalla —
+ * ahí usamos gris fijo en su lugar, independientemente de su posición.
+ */
+export function colorResultadoLista(lista: {
+  esBlanco: boolean;
+  color: string | null;
+  indice: number;
+}): string {
+  if (lista.esBlanco) return "#9aa7b3";
+  return colorDeLista(lista.color, lista.indice);
+}
+
 export function esColorClaro(hex: string): boolean {
   const valor = hex.replace("#", "");
   if (valor.length !== 6) return false;
