@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { CerrarSesionDialog } from "@/components/admin/cerrar-sesion-dialog";
 import { FacultadLogo } from "@/components/brand/facultad-logo";
 import { SECCIONES, SECCION_LABELS, type Seccion } from "@/lib/api/elecciones";
 import { cn } from "@/lib/utils";
@@ -91,28 +92,7 @@ export function AdminSidebar({
 
         <div className="flex-1" />
 
-        <button
-          type="button"
-          onClick={onLogout}
-          className="flex items-center gap-2 pt-3 text-[12.5px] font-semibold text-white/60 transition-colors hover:text-white/80"
-        >
-          Cerrar sesión
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            aria-hidden="true"
-          >
-            <path
-              d="M5 12h13M13 6l6 6-6 6"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
+        <CerrarSesionDialog onConfirm={onLogout} />
       </aside>
     </>
   );
