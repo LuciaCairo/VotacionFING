@@ -6,7 +6,8 @@ import { SECCIONES, SECCION_LABELS, type Seccion } from "@/lib/api/elecciones";
 import { cn } from "@/lib/utils";
 
 interface AdminSidebarProps {
-  activeSeccion: Seccion;
+  /** `null` cuando ninguna de las 3 secciones corresponde a la pantalla actual (ej. Padrón). */
+  activeSeccion: Seccion | null;
   onSelectSeccion: (seccion: Seccion) => void;
   onLogout: () => void;
   open: boolean;

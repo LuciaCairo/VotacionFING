@@ -140,20 +140,30 @@ export async function obtenerDetalleEleccionAdmin(eleccionId: number) {
 
 /**
  * Devuelve el padrón de votantes con sus datos públicos (sin password).
- * Si se pasa `busqueda`, filtra por coincidencia parcial case-insensitive
- * en legajo o nombre_completo. Ordenado por nombre_completo ASC.
+ * Solo incluye votantes `activo: true` — mismo criterio que el resto de la
+ * app usa para definir "el padrón" (ver `totalPadron` en
+ * eleccion.service.ts y el check de login en auth.service.ts). Un votante
+ * inactivo no puede loguearse ni votar, así que tampoco pertenece al
+ * padrón que ve el admin acá (si hace falta auditar inactivos también, para
+ * eso está `descargarPadronCsv`, que sí los incluye con su columna `activo`).
+ * Si se pasa `busqueda`, filtra además por coincidencia parcial
+ * case-insensitive en legajo o nombre_completo. Ordenado por
+ * nombre_completo ASC.
  */
 export async function listarPadron(busqueda?: string) {
   const termino = busqueda?.trim();
 
-  const where = termino
-    ? {
-        OR: [
-          { legajo: { contains: termino, mode: 'insensitive' as const } },
-          { nombreCompleto: { contains: termino, mode: 'insensitive' as const } },
-        ],
-      }
-    : {};
+  const where = {
+    activo: true,
+    ...(termino
+      ? {
+          OR: [
+            { legajo: { contains: termino, mode: 'insensitive' as const } },
+            { nombreCompleto: { contains: termino, mode: 'insensitive' as const } },
+          ],
+        }
+      : {}),
+  };
 
   const votantes = await prisma.votante.findMany({
     where,
@@ -163,6 +173,7 @@ export async function listarPadron(busqueda?: string) {
       legajo: true,
       nombreCompleto: true,
       carrera: true,
+      correo: true,
     },
   });
 
@@ -173,6 +184,7 @@ export async function listarPadron(busqueda?: string) {
       legajo: v.legajo,
       nombre_completo: v.nombreCompleto,
       carrera: v.carrera,
+      correo: v.correo,
     })),
   };
 }

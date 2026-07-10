@@ -18,16 +18,22 @@ interface ErrorBody {
  * - Si el fetch nunca llega a tener respuesta (sin conexión, timeout,
  *   backend caído, CORS bloqueado): lanza `NetworkError`.
  */
-async function request<TResponse>(
+/**
+ * Fetch con timeout, compartido por `request` (respuestas JSON) y `getBlob`
+ * (respuestas binarias/CSV): solo resuelve la parte que es igual para
+ * ambas — llegar a tener una `Response`, o lanzar `NetworkError` si el
+ * fetch nunca llega a completarse. No toca el body: cada caller lo lee
+ * según el content-type que espera (`.json()` vs `.blob()`).
+ */
+async function fetchConTimeout(
   path: string,
   init: RequestInit,
-): Promise<TResponse> {
+): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-  let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    return await fetch(`${API_URL}${path}`, {
       ...init,
       signal: controller.signal,
     });
@@ -39,7 +45,13 @@ async function request<TResponse>(
   } finally {
     clearTimeout(timeoutId);
   }
+}
 
+async function request<TResponse>(
+  path: string,
+  init: RequestInit,
+): Promise<TResponse> {
+  const response = await fetchConTimeout(path, init);
   const data: unknown = await response.json().catch(() => null);
 
   if (!response.ok) {
@@ -77,4 +89,28 @@ export function deleteJson<TResponse>(path: string): Promise<TResponse> {
     method: "DELETE",
     headers: { ...getAuthHeader() },
   });
+}
+
+/**
+ * GET autenticado que devuelve un archivo binario (ej. el CSV de
+ * /api/admin/padron/descargar) en vez de JSON. El body de error sigue
+ * siendo JSON (`{ error }`, mismo error-handler plugin del backend), así
+ * que en el camino de error sí lo parseamos; en el camino de éxito no —
+ * `response.json()` sobre un CSV rompería el parseo.
+ */
+export async function getBlob(path: string): Promise<Blob> {
+  const response = await fetchConTimeout(path, {
+    method: "GET",
+    headers: { ...getAuthHeader() },
+  });
+
+  if (!response.ok) {
+    const data: unknown = await response.json().catch(() => null);
+    const message =
+      (data as ErrorBody | null)?.error ??
+      "Ocurrió un error inesperado. Intentá nuevamente.";
+    throw new ApiError(response.status, message);
+  }
+
+  return response.blob();
 }
