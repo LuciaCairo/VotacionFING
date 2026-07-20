@@ -28,9 +28,10 @@ interface ErrorBody {
 async function fetchConTimeout(
   path: string,
   init: RequestInit,
+  timeoutMs: number = TIMEOUT_MS,
 ): Promise<Response> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     return await fetch(`${API_URL}${path}`, {
@@ -50,8 +51,9 @@ async function fetchConTimeout(
 async function request<TResponse>(
   path: string,
   init: RequestInit,
+  timeoutMs?: number,
 ): Promise<TResponse> {
-  const response = await fetchConTimeout(path, init);
+  const response = await fetchConTimeout(path, init, timeoutMs);
   const data: unknown = await response.json().catch(() => null);
 
   if (!response.ok) {
@@ -64,15 +66,29 @@ async function request<TResponse>(
   return data as TResponse;
 }
 
+/**
+ * POST autenticado (adjunta el header `Authorization` si hay sesión guardada
+ * — inofensivo para endpoints públicos como login, donde no hay sesión
+ * todavía y `getAuthHeader()` devuelve `{}`).
+ *
+ * `timeoutMs` permite overridear el timeout default (15s) para endpoints que
+ * se sabe que tardan más — ej. POST /api/admin/elecciones, que despliega un
+ * contrato en BFA antes de responder.
+ */
 export function postJson<TResponse>(
   path: string,
   body: unknown,
+  options?: { timeoutMs?: number },
 ): Promise<TResponse> {
-  return request<TResponse>(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  return request<TResponse>(
+    path,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getAuthHeader() },
+      body: JSON.stringify(body),
+    },
+    options?.timeoutMs,
+  );
 }
 
 /** GET autenticado: adjunta el header `Authorization` de la sesión guardada (ver lib/auth/session.ts). */

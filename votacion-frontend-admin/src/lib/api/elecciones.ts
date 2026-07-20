@@ -1,4 +1,4 @@
-import { deleteJson, getJson } from "./http";
+import { deleteJson, getJson, postJson } from "./http";
 
 /**
  * Contrato de GET /api/admin/elecciones
@@ -84,6 +84,45 @@ export interface EleccionDetalleDTO {
 
 export function obtenerEleccionRequest(id: number): Promise<EleccionDetalleDTO> {
   return getJson<EleccionDetalleDTO>(`/api/admin/elecciones/${id}`);
+}
+
+/**
+ * Body de POST /api/admin/elecciones (ver crearEleccionSchema en el backend).
+ * `color` es opcional/nullable en el schema del backend, pero esta pantalla
+ * siempre manda un color elegido (paleta o custom) — nunca `null` desde acá.
+ *
+ * El backend agrega automáticamente una lista "Voto en blanco" (color
+ * #FFFFFF fijo) al desplegar el contrato — este array nunca la incluye ni
+ * cuenta para el mínimo de 2 listas.
+ */
+export interface ListaCreacionInput {
+  nombre: string;
+  color: string;
+}
+
+export interface CrearEleccionInput {
+  nombre: string;
+  fecha_inicio: string;
+  fecha_cierre: string;
+  listas: ListaCreacionInput[];
+}
+
+/**
+ * El deploy del contrato en BFA puede tardar bastante más que el timeout
+ * default de `postJson` (15s) — ver desplegarContrato en el backend.
+ */
+export const CREAR_ELECCION_TIMEOUT_MS = 60_000;
+
+/**
+ * La respuesta 201 tiene el mismo shape que el detalle (`EleccionDetalleDTO`):
+ * incluye `es_blanco` e `indice` por lista, más `contrato_address` ya seteado.
+ */
+export function crearEleccionRequest(
+  input: CrearEleccionInput,
+): Promise<EleccionDetalleDTO> {
+  return postJson<EleccionDetalleDTO>("/api/admin/elecciones", input, {
+    timeoutMs: CREAR_ELECCION_TIMEOUT_MS,
+  });
 }
 
 /**
