@@ -146,3 +146,55 @@ export function eliminarEleccionRequest(
 ): Promise<EliminarEleccionResponse> {
   return deleteJson<EliminarEleccionResponse>(`/api/admin/elecciones/${id}`);
 }
+
+/**
+ * Contrato de GET /api/admin/elecciones/:id/integridad
+ * (ver votacion-backend/src/modules/admin/admin.service.ts, verificarIntegridadEleccion).
+ *
+ * Antes de llegar a este shape el backend puede responder 404 (no existe la
+ * elección), 409 (todavía no tiene contrato desplegado en BFA) o 503 (no se
+ * pudo conectar a la blockchain) — esos casos llegan como `ApiError`, no
+ * como este DTO.
+ */
+export type IntegridadEstado =
+  | "verificada"
+  | "discrepancias"
+  | "con_advertencias"
+  | "no_aplica";
+
+export interface IntegridadCheckDTO {
+  campo: string;
+  ok: boolean;
+  bd?: string | number | boolean | null;
+  bfa?: string | number | boolean | null;
+  /** true en checks que no comparan contra BFA (ej. consistencia interna estado/fechas). */
+  interno?: boolean;
+}
+
+export interface IntegridadSeccionDTO {
+  estado: IntegridadEstado;
+  checks: IntegridadCheckDTO[];
+}
+
+export interface IntegridadSeccionesDTO {
+  eleccion: IntegridadSeccionDTO;
+  listas: IntegridadSeccionDTO;
+  resultados: IntegridadSeccionDTO;
+  participacion: IntegridadSeccionDTO;
+}
+
+export interface IntegridadEleccionDTO {
+  eleccion_id: number;
+  verificado_at: string;
+  /** Nunca "no_aplica" a nivel global (ver estadoDeChecks/integridadGlobal en el backend). */
+  integridad_global: Exclude<IntegridadEstado, "no_aplica">;
+  secciones: IntegridadSeccionesDTO;
+}
+
+export function obtenerIntegridadRequest(
+  id: number,
+): Promise<IntegridadEleccionDTO> {
+  return getJson<IntegridadEleccionDTO>(
+    `/api/admin/elecciones/${id}/integridad`,
+  );
+}

@@ -8,6 +8,7 @@ import { EliminarEleccionDialog } from "@/components/admin/eleccion/eliminar-ele
 import { EstadoEleccionCard } from "@/components/admin/eleccion/estado-eleccion-card";
 import { FechaCard } from "@/components/admin/eleccion/fecha-card";
 import { ListaRow } from "@/components/admin/eleccion/lista-row";
+import { VerIntegridadButton } from "@/components/admin/eleccion/ver-integridad-button";
 import { useEleccionDetalle } from "@/hooks/use-eleccion-detalle";
 import type { EleccionDetalleDTO } from "@/lib/api/elecciones";
 import { ApiError } from "@/lib/api/errors";
@@ -72,11 +73,16 @@ export default function EleccionDetallePage() {
             )}
           </div>
 
-          {query.isSuccess && query.data.estado === "creada" && (
-            <EliminarEleccionDialog
-              eleccionId={query.data.id}
-              nombreEleccion={query.data.nombre}
-            />
+          {query.isSuccess && (
+            <div className="flex shrink-0 items-center gap-2.5">
+              <VerIntegridadButton eleccionId={query.data.id} />
+              {query.data.estado === "creada" && (
+                <EliminarEleccionDialog
+                  eleccionId={query.data.id}
+                  nombreEleccion={query.data.nombre}
+                />
+              )}
+            </div>
           )}
         </div>
 

@@ -9,6 +9,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-heading: var(--font-sans);
+  --font-mono: var(--font-mono);
   --animate-pop-in: pop-in 0.35s ease;
   --animate-shake: shake 0.4s ease;
   --animate-spin-fast: spin-fast 0.7s linear infinite;

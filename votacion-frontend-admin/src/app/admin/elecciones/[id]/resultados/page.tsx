@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
+import { VerIntegridadButton } from "@/components/admin/eleccion/ver-integridad-button";
 import { useResultadosEleccion } from "@/hooks/use-resultados-eleccion";
 import type {
   ListaResultadoDTO,
@@ -37,18 +38,22 @@ export default function ResultadosEleccionPage() {
   return (
     <div className="min-h-screen w-full bg-[#d7dde3] p-4 md:p-10 lg:h-screen lg:overflow-hidden">
       <div className="mx-auto max-w-[920px] rounded-[20px] bg-[#eef1f5] p-5 shadow-[0_20px_50px_rgba(10,37,64,0.14)] md:p-6 lg:flex lg:h-full lg:flex-col">
-        <div className="mb-1.5 flex shrink-0 items-center gap-3.5">
-          <button
-            type="button"
-            onClick={() => router.push(RUTA_HOME_FINALIZADAS)}
-            aria-label="Volver al panel de elecciones"
-            className="flex size-[38px] shrink-0 items-center justify-center rounded-[10px] text-[#0a2540] transition-colors hover:bg-black/[0.05]"
-          >
-            <ChevronLeft className="size-5" aria-hidden="true" />
-          </button>
-          <h1 className="text-2xl font-extrabold text-[#0a2540]">
-            Resultados de la Elección
-          </h1>
+        <div className="mb-1.5 flex shrink-0 items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <button
+              type="button"
+              onClick={() => router.push(RUTA_HOME_FINALIZADAS)}
+              aria-label="Volver al panel de elecciones"
+              className="flex size-[38px] shrink-0 items-center justify-center rounded-[10px] text-[#0a2540] transition-colors hover:bg-black/[0.05]"
+            >
+              <ChevronLeft className="size-5" aria-hidden="true" />
+            </button>
+            <h1 className="text-2xl font-extrabold text-[#0a2540]">
+              Resultados de la Elección
+            </h1>
+          </div>
+
+          {query.isSuccess && <VerIntegridadButton eleccionId={query.data.id} />}
         </div>
 
         <div className="min-h-0 flex-1 lg:flex lg:flex-col">
@@ -178,7 +183,7 @@ function BannerGanador({
       </div>
       <div className="flex-1">
         <div className="text-base font-extrabold text-[#146b3b]">
-          "{nombreLista}" ganó la elección
+          &quot;{nombreLista}&quot; ganó la elección
         </div>
         <div className="mt-0.5 text-[13.5px] leading-[1.4] text-[#1e9e5c]">
           Obtuvo {votos} de {totalVotos} votos emitidos.
