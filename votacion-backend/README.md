@@ -11,7 +11,7 @@ API REST en **Node.js 20 + Fastify + TypeScript**, con **Prisma/PostgreSQL**,
 
 ## Estado actual
 
-Esta entrega incluye la **base del proyecto** completa y funcional:
+El backend está **completo y probado**:
 
 - ✅ Estructura de carpetas y configuración (`package.json`, `tsconfig`, env tipado con Zod).
 - ✅ Esquema Prisma completo (7 tablas, enums, restricciones `UNIQUE` compuestas y FKs).
@@ -20,12 +20,19 @@ Esta entrega incluye la **base del proyecto** completa y funcional:
 - ✅ Plugins: autenticación JWT + lista negra, guard por rol, manejo de errores global.
 - ✅ **Módulo de autenticación completo** (login votante, login admin, logout) con bloqueo
   de 5 intentos / 10 minutos en Redis.
+- ✅ **Módulo admin completo**: CRUD de elecciones (`GET/POST /api/admin/elecciones`,
+  `GET/DELETE /api/admin/elecciones/:id`), auditoría de integridad BD vs. BFA
+  (`GET /api/admin/elecciones/:id/integridad`), Padrón Electoral (`GET /api/admin/padron`
+  y `/padron/descargar`), saldo de la cuenta blockchain (`GET /api/admin/blockchain/saldo`).
+- ✅ **Módulo votante completo**: elecciones vigentes/finalizadas, detalle, emisión de
+  voto y comprobante (`/api/votante/elecciones/...`).
+- ✅ Endpoint compartido admin/votante de resultados de una elección finalizada
+  (`GET /api/elecciones/:id/resultados`).
 - ✅ Cron jobs de transición de estados de elecciones.
 - ✅ Seed de datos de prueba.
 
-Pendiente (siguientes pasos, endpoint por endpoint): módulos **votante** (5 endpoints)
-y **admin** (8 endpoints). Las rutas ya están "cableadas" en `app.ts` (comentadas) para
-ir activándolas.
+Módulo pendiente: **frontend votante** (el frontend admin ya está completo y consume
+esta API en su totalidad).
 
 ---
 
@@ -101,8 +108,9 @@ src/
   services/      blockchain (ethers/BFA), log (tabla LOG)
   modules/
     auth/        login votante/admin, logout
-    votante/     (pendiente)
-    admin/       (pendiente)
+    votante/     elecciones vigentes/finalizadas, detalle, votar, comprobante
+    admin/       CRUD elecciones, integridad, padrón, saldo blockchain
+    eleccion/    endpoint compartido de resultados (no lleva prefijo /admin ni /votante)
   jobs/          cron de apertura/cierre automático de elecciones
   utils/         password (bcrypt), errores de dominio, helpers de request
   types/         tipos del JWT
