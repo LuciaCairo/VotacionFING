@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronRight, Trash2 } from "lucide-react";
+import { esColorClaro } from "@/lib/colors";
 
 interface ListaFormRowProps {
   nombre: string;
@@ -23,6 +24,8 @@ export function ListaFormRow({
   onEdit,
   onDelete,
 }: ListaFormRowProps) {
+  const textColor = esColorClaro(color) ? "#0a2540" : "#ffffff";
+
   return (
     <div className="flex items-stretch gap-2">
       <button
@@ -32,10 +35,13 @@ export function ListaFormRow({
         className="flex flex-1 items-center justify-between rounded-[10px] border-none px-4 py-3.5 disabled:cursor-not-allowed disabled:opacity-60"
         style={{ backgroundColor: color }}
       >
-        <span className="text-sm font-bold tracking-[0.3px] text-white">
+        <span
+          className="text-sm font-bold tracking-[0.3px]"
+          style={{ color: textColor }}
+        >
           {nombre}
         </span>
-        <ChevronRight className="size-4 text-white" aria-hidden="true" />
+        <ChevronRight className="size-4" style={{ color: textColor }} aria-hidden="true" />
       </button>
       <button
         type="button"

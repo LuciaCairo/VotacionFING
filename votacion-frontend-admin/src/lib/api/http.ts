@@ -19,13 +19,15 @@ interface ErrorBody {
  *   backend caído, CORS bloqueado): lanza `NetworkError`.
  */
 /**
- * Fetch con timeout, compartido por `request` (respuestas JSON) y `getBlob`
- * (respuestas binarias/CSV): solo resuelve la parte que es igual para
- * ambas — llegar a tener una `Response`, o lanzar `NetworkError` si el
+ * Fetch con timeout, compartido por `request` (respuestas JSON), `getBlob`
+ * (respuestas binarias/CSV) y otros callers fuera de este módulo que
+ * necesitan pegarle al backend sin arriesgarse a colgar para siempre (ej.
+ * logoutRequest en lib/api/auth.ts) — solo resuelve la parte que es igual
+ * para todos: llegar a tener una `Response`, o lanzar `NetworkError` si el
  * fetch nunca llega a completarse. No toca el body: cada caller lo lee
  * según el content-type que espera (`.json()` vs `.blob()`).
  */
-async function fetchConTimeout(
+export async function fetchConTimeout(
   path: string,
   init: RequestInit,
   timeoutMs: number = TIMEOUT_MS,
