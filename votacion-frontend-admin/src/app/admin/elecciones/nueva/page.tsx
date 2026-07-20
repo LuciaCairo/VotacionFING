@@ -8,6 +8,7 @@ import { AdminShell } from "@/components/admin/admin-shell";
 import { ConfirmarCreacionDialog } from "@/components/admin/eleccion/confirmar-creacion-dialog";
 import { ListaDialog, PALETA_LISTAS } from "@/components/admin/eleccion/lista-dialog";
 import { ListaFormRow } from "@/components/admin/eleccion/lista-form-row";
+import { SaldoBlockchainIndicator } from "@/components/admin/eleccion/saldo-blockchain-indicator";
 import { useCrearEleccion } from "@/hooks/use-crear-eleccion";
 import { useLogout } from "@/hooks/use-logout";
 import type { CrearEleccionInput, Seccion } from "@/lib/api/elecciones";
@@ -172,7 +173,10 @@ export default function CrearEleccionPage() {
       mobileTitle="Crear Elección"
     >
       <div className="mx-auto w-full max-w-[1080px]">
-        <h1 className="mb-6 text-2xl font-extrabold text-[#0a2540]">Crear Elección</h1>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-extrabold text-[#0a2540]">Crear Elección</h1>
+          <SaldoBlockchainIndicator />
+        </div>
 
         <form
           onSubmit={handleSubmit(onValidSubmit)}
