@@ -10,6 +10,7 @@
   --font-sans: var(--font-sans);
   --font-heading: var(--font-sans);
   --animate-pop-in: pop-in 0.35s ease;
+  --animate-slide-up: slide-up 0.55s cubic-bezier(0.16, 1, 0.3, 1);
   --animate-shake: shake 0.4s ease;
   --animate-spin-fast: spin-fast 0.7s linear infinite;
   --color-sidebar-ring: var(--sidebar-ring);
@@ -148,6 +149,17 @@
   }
   100% {
     transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  0% {
+    transform: translateY(90px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
     opacity: 1;
   }
 }

@@ -166,9 +166,6 @@ export function LoginForm() {
       <h1 className="mb-2 text-[24px] font-extrabold text-[#0a2540]">
         Iniciar sesión
       </h1>
-      <p className="mb-5 text-sm text-[#5b6b7c]">
-        Ingresá con tu legajo y contraseña para votar.
-      </p>
 
       {classifiedError?.kind === "invalid_credentials" && (
         <LoginBanner
@@ -295,7 +292,10 @@ export function LoginForm() {
         </button>
       )}
 
-      <div className="mt-4 text-center text-xs text-[#9aa7b3]">
+      {/* En mobile la tarjeta ya está apretada de espacio (bottom sheet a
+          pantalla completa); este disclaimer solo se muestra desde el
+          panel de escritorio, que tiene lugar de sobra. */}
+      <div className="mt-4 hidden text-center text-xs text-[#9aa7b3] md:block">
         Sistema de Votación Electrónica — Acceso restringido a votantes
       </div>
     </div>
