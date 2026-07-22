@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Eye, EyeOff } from "lucide-react";
 import { loginVotanteSchema, type LoginVotanteInput } from "@/lib/validations/auth";
 import { classifyLoginError, useLoginVotante } from "@/hooks/use-login";
 import { saveVotanteSession, useVotanteSession } from "@/lib/auth/session";
@@ -26,6 +27,7 @@ const DEV_VOTANTE_CREDENTIALS: LoginVotanteInput = {
 
 export function LoginForm() {
   const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false);
   const mutation = useLoginVotante();
   const existingSession = useVotanteSession();
   const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -234,21 +236,37 @@ export function LoginForm() {
           >
             Contraseña
           </label>
-          <input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            placeholder="••••••••"
-            disabled={isFormDisabled}
-            aria-invalid={!!errors.password}
-            aria-describedby={errors.password ? "password-error" : undefined}
-            className="rounded-[10px] border-[1.5px] px-3.5 py-3 text-base outline-none disabled:cursor-not-allowed sm:py-2.5 sm:text-sm"
-            style={{
-              borderColor: errors.password ? "#d64545" : "#d7dde3",
-              backgroundColor: isFormDisabled ? "#f4f6f8" : "#fff",
-            }}
-            {...register("password", { onChange: handleFieldChange })}
-          />
+          <div className="relative">
+            <input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
+              placeholder="••••••••"
+              disabled={isFormDisabled}
+              aria-invalid={!!errors.password}
+              aria-describedby={errors.password ? "password-error" : undefined}
+              className="w-full rounded-[10px] border-[1.5px] px-3.5 py-3 pr-11 text-base outline-none disabled:cursor-not-allowed sm:py-2.5 sm:text-sm"
+              style={{
+                borderColor: errors.password ? "#d64545" : "#d7dde3",
+                backgroundColor: isFormDisabled ? "#f4f6f8" : "#fff",
+              }}
+              {...register("password", { onChange: handleFieldChange })}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              disabled={isFormDisabled}
+              tabIndex={-1}
+              aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              className="absolute top-1/2 right-3 -translate-y-1/2 text-[#9aa7b3] transition-colors hover:text-[#5b6b7c] disabled:cursor-not-allowed"
+            >
+              {showPassword ? (
+                <EyeOff className="h-[18px] w-[18px]" aria-hidden="true" />
+              ) : (
+                <Eye className="h-[18px] w-[18px]" aria-hidden="true" />
+              )}
+            </button>
+          </div>
           {errors.password && (
             <span id="password-error" className="text-xs font-medium text-[#d64545]">
               {errors.password.message}

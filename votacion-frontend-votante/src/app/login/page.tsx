@@ -14,25 +14,31 @@ export const metadata: Metadata = {
  * formulario) dentro de una caja de alto acotado, para que entre siempre
  * sin scroll en vez de depender de que la ventana sea suficientemente alta.
  *
- * El contenedor mobile fija `overflow-x-hidden` (los círculos decorativos
- * tienen offsets negativos que si no se recortan generan scroll horizontal)
- * pero deja `overflow-y-auto` como red de seguridad: en el caso normal el
- * contenido entra justo en `h-dvh` y no se nota, pero si el banner de error
- * ("Credenciales incorrectas", "Cuenta bloqueada", etc.) agranda la
- * tarjeta, o el celu tiene menos alto disponible que el promedio, hay
- * scroll en vez de contenido recortado.
+ * El contenedor mobile deja `overflow-y-auto` como red de seguridad: en el
+ * caso normal el contenido entra justo en `h-dvh` y no se nota, pero si el
+ * banner de error ("Credenciales incorrectas", "Cuenta bloqueada", etc.)
+ * agranda la tarjeta, o el celu tiene menos alto disponible que el
+ * promedio, hay scroll en vez de contenido recortado. Los círculos
+ * decorativos (con offsets negativos a propósito, para que sobresalgan del
+ * borde) van en su propia capa `absolute inset-0 overflow-hidden`: si
+ * colgaran directo del contenedor con scroll, ese sobresaliente se
+ * convertiría en scroll real ("scrollear para ver más círculo").
  */
 export default function LoginPage() {
   return (
     <>
       {/* Mobile (< md): una columna a pantalla completa, tarjeta pegada al
-          borde inferior con bordes rectos abajo. */}
-      <div className="relative flex h-dvh w-full flex-col overflow-x-hidden overflow-y-auto bg-[linear-gradient(160deg,#0d3a63_0%,#0a2540_55%,#071a30_100%)] md:hidden">
-        <div className="pointer-events-none absolute top-[-60px] right-[-60px] h-[220px] w-[220px] rounded-full border border-white/[0.08]" />
-        <div className="pointer-events-none absolute right-[-20px] bottom-[-80px] h-[260px] w-[260px] rounded-full border border-white/[0.06]" />
+          borde inferior sin borde visible ahí (bordes rectos abajo, la
+          tarjeta "sale" del borde de la pantalla en vez de flotar con un
+          canto redondeado que dejaría ver el azul de fondo en las puntas). */}
+      <div className="relative flex h-dvh w-full flex-col overflow-y-auto bg-[linear-gradient(160deg,#0d3a63_0%,#0a2540_55%,#071a30_100%)] md:hidden">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute top-[-60px] right-[-60px] h-[220px] w-[220px] rounded-full border border-white/[0.08]" />
+          <div className="absolute right-[-20px] bottom-[-80px] h-[260px] w-[260px] rounded-full border border-white/[0.06]" />
+        </div>
 
-        <div className="z-10 flex w-full flex-1 flex-col items-center justify-center gap-3 px-6 pt-10 pb-8">
-          <FacultadLogo className="h-[104px] w-auto object-contain drop-shadow-[0_8px_18px_rgba(5,20,40,0.35)]" />
+        <div className="z-10 flex w-full flex-1 flex-col items-center justify-center gap-2 px-6 pt-4 pb-4">
+          <FacultadLogo className="h-[88px] w-auto object-contain drop-shadow-[0_8px_18px_rgba(5,20,40,0.35)]" />
           <div className="text-center">
             <div className="text-[20px] leading-[1.2] font-extrabold tracking-[-0.3px] text-white">
               Votación Electrónica
@@ -44,7 +50,7 @@ export default function LoginPage() {
         </div>
 
         <div className="z-10 flex w-full flex-col items-center px-5">
-          <div className="animate-slide-up w-full max-w-[380px] rounded-t-[20px] bg-white px-6 pt-7 pb-[max(2.5rem,env(safe-area-inset-bottom))] shadow-[0_20px_45px_rgba(4,14,26,0.35)]">
+          <div className="animate-slide-up w-full max-w-[380px] rounded-t-[20px] bg-white px-6 pt-6 pb-[max(4.5rem,calc(3rem+env(safe-area-inset-bottom)))] shadow-[0_20px_45px_rgba(4,14,26,0.35)]">
             <LoginForm />
           </div>
         </div>
