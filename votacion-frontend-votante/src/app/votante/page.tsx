@@ -1,20 +1,54 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useLogout } from "@/hooks/use-logout";
+import { useEleccionesVigentes } from "@/hooks/use-elecciones-vigentes";
+import { useEleccionesFinalizadas } from "@/hooks/use-elecciones-finalizadas";
 import { VotanteShell } from "@/components/votante/votante-shell";
-import type { VotanteSeccion } from "@/components/votante/votante-sidebar";
+import {
+  VOTANTE_SECCION_LABELS,
+  type VotanteSeccion,
+} from "@/components/votante/votante-sidebar";
+import { EleccionVigenteCard } from "@/components/votante/eleccion-vigente-card";
+import { EleccionFinalizadaCard } from "@/components/votante/eleccion-finalizada-card";
+import { EmptyEleccionesState } from "@/components/votante/empty-state";
+import { ApiError } from "@/lib/api/errors";
+import { clearVotanteSession } from "@/lib/auth/session";
 
 /**
- * Única página del área del votante: el nav (sidebar) no navega de verdad
- * entre "Elecciones vigentes"/"Elecciones finalizadas" — cambia
- * `activeSeccion`, igual que el Home del admin con sus 3 secciones. El
- * contenido de cada sección es un placeholder a propósito: viene con su
- * propio prompt y prototipo de referencia, trabajo aparte de este nav.
+ * Única página del área del votante. Las dos secciones no navegan de
+ * verdad (ver [[votante-shell]]) — cambian `activeSeccion` en estado
+ * local, igual que las 3 secciones del Home del admin.
+ *
+ * Ambas queries se disparan de entrada (no solo la de la sección activa):
+ * así cambiar de tab es instantáneo, sin esperar un fetch nuevo, mismo
+ * criterio que el admin (que resuelve sus 3 secciones con una sola query
+ * ya cargada). Acá son dos porque el backend expone dos endpoints
+ * separados, no uno agrupado.
  */
 export default function VotantePage() {
+  const router = useRouter();
   const logout = useLogout();
   const [activeSeccion, setActiveSeccion] = useState<VotanteSeccion>("vigentes");
+
+  const vigentesQuery = useEleccionesVigentes();
+  const finalizadasQuery = useEleccionesFinalizadas();
+  const activeQuery = activeSeccion === "vigentes" ? vigentesQuery : finalizadasQuery;
+
+  // Sesión expirada del lado del servidor (401): limpiamos el JWT local y
+  // mandamos a /login en vez de mostrar un error genérico o una lista vacía.
+  useEffect(() => {
+    const error = vigentesQuery.error ?? finalizadasQuery.error;
+    if (error instanceof ApiError && error.status === 401) {
+      clearVotanteSession();
+      router.replace("/login");
+    }
+  }, [vigentesQuery.error, finalizadasQuery.error, router]);
+
+  const sesionExpirada =
+    (vigentesQuery.error instanceof ApiError && vigentesQuery.error.status === 401) ||
+    (finalizadasQuery.error instanceof ApiError && finalizadasQuery.error.status === 401);
 
   return (
     <VotanteShell
@@ -22,11 +56,70 @@ export default function VotantePage() {
       onSelectSeccion={setActiveSeccion}
       onLogout={logout}
     >
-      <div className="text-sm text-[#5b6b7c]">
-        {activeSeccion === "vigentes"
-          ? "Elecciones vigentes — próximamente."
-          : "Elecciones finalizadas — próximamente."}
+      <h1 className="mb-6 text-[22px] font-extrabold text-[#0a2540]">
+        {VOTANTE_SECCION_LABELS[activeSeccion]}
+      </h1>
+
+      <div className="flex max-w-[960px] flex-col gap-3">
+        {activeQuery.isPending && <EleccionesSkeleton />}
+
+        {activeQuery.isError && !sesionExpirada && (
+          <EleccionesErrorState onRetry={() => activeQuery.refetch()} />
+        )}
+
+        {activeSeccion === "vigentes" &&
+          vigentesQuery.isSuccess &&
+          (vigentesQuery.data.vigentes.length === 0 ? (
+            <EmptyEleccionesState mensaje="No hay elecciones vigentes en este momento." />
+          ) : (
+            vigentesQuery.data.vigentes.map((eleccion) => (
+              <EleccionVigenteCard key={eleccion.id} eleccion={eleccion} />
+            ))
+          ))}
+
+        {activeSeccion === "finalizadas" &&
+          finalizadasQuery.isSuccess &&
+          (finalizadasQuery.data.finalizadas.length === 0 ? (
+            <EmptyEleccionesState mensaje="No hay elecciones finalizadas todavía." />
+          ) : (
+            finalizadasQuery.data.finalizadas.map((eleccion) => (
+              <EleccionFinalizadaCard key={eleccion.id} eleccion={eleccion} />
+            ))
+          ))}
       </div>
     </VotanteShell>
+  );
+}
+
+function EleccionesSkeleton() {
+  return (
+    <div aria-hidden="true" className="flex flex-col gap-3">
+      {[0, 1].map((i) => (
+        <div
+          key={i}
+          className="h-[68px] animate-pulse rounded-xl border border-[#e2e7ec] bg-white shadow-[0_4px_14px_rgba(10,37,64,0.06)]"
+        />
+      ))}
+    </div>
+  );
+}
+
+function EleccionesErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="rounded-xl border border-[#f6c6c6] bg-[#fdecec] p-6 text-center">
+      <p className="text-[13.5px] font-semibold text-[#9c2b2b]">
+        No pudimos cargar las elecciones.
+      </p>
+      <p className="mt-1 text-[13px] text-[#a83d3d]">
+        Revisá tu conexión e intentá de nuevo.
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-4 rounded-[8px] border border-[#d64545]/30 bg-white px-4 py-2 text-[13px] font-bold text-[#9c2b2b] transition-colors hover:bg-[#fdecec]"
+      >
+        Reintentar
+      </button>
+    </div>
   );
 }
