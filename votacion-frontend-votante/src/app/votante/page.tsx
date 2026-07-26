@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useLogout } from "@/hooks/use-logout";
 import { useEleccionesVigentes } from "@/hooks/use-elecciones-vigentes";
 import { useEleccionesFinalizadas } from "@/hooks/use-elecciones-finalizadas";
 import { VotanteShell } from "@/components/votante/votante-shell";
 import {
+  VOTANTE_SECCIONES,
   VOTANTE_SECCION_LABELS,
   type VotanteSeccion,
 } from "@/components/votante/votante-sidebar";
@@ -15,6 +16,23 @@ import { EleccionFinalizadaCard } from "@/components/votante/eleccion-finalizada
 import { EmptyEleccionesState } from "@/components/votante/empty-state";
 import { ApiError } from "@/lib/api/errors";
 import { clearVotanteSession } from "@/lib/auth/session";
+
+function esVotanteSeccion(valor: string | null): valor is VotanteSeccion {
+  return VOTANTE_SECCIONES.includes(valor as VotanteSeccion);
+}
+
+/**
+ * `useSearchParams` obliga a un límite de Suspense para no bloquear el
+ * prerender estático de esta ruta (ver docs de Next.js) — mismo patrón que
+ * `AdminHomePage` del panel de administración.
+ */
+export default function VotantePage() {
+  return (
+    <Suspense fallback={null}>
+      <VotanteHomeContent />
+    </Suspense>
+  );
+}
 
 /**
  * Única página del área del votante. Las dos secciones no navegan de
@@ -26,11 +44,19 @@ import { clearVotanteSession } from "@/lib/auth/session";
  * criterio que el admin (que resuelve sus 3 secciones con una sola query
  * ya cargada). Acá son dos porque el backend expone dos endpoints
  * separados, no uno agrupado.
+ *
+ * `seccionInicial` viene de `?seccion=`: la pantalla de Resultados vuelve
+ * a `/votante?seccion=finalizadas` (ver [[app/elecciones/[id]/resultados]]),
+ * mismo criterio que el botón "Volver" del admin.
  */
-export default function VotantePage() {
+function VotanteHomeContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const logout = useLogout();
-  const [activeSeccion, setActiveSeccion] = useState<VotanteSeccion>("vigentes");
+  const seccionInicial = searchParams.get("seccion");
+  const [activeSeccion, setActiveSeccion] = useState<VotanteSeccion>(
+    esVotanteSeccion(seccionInicial) ? seccionInicial : "vigentes",
+  );
 
   const vigentesQuery = useEleccionesVigentes();
   const finalizadasQuery = useEleccionesFinalizadas();

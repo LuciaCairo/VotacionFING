@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { EleccionFinalizadaDTO } from "@/lib/api/elecciones";
 import { formatFechaCorta } from "@/lib/format";
 
@@ -23,8 +24,11 @@ function resultadoTexto(resultado: EleccionFinalizadaDTO["resultado"]): string {
 
 /**
  * Misma estructura/estilo que `ElectionCard` del admin. El botón "Ver"
- * todavía no navega (el detalle de resultados es otro prompt); por ahora
- * solo loguea en consola.
+ * navega a la pantalla de resultados (ver
+ * app/elecciones/[id]/resultados/page.tsx) — a diferencia de
+ * `EleccionVigenteCard`, acá sí hay una pantalla real detrás: no hay
+ * resultados en tiempo real, así que solo tiene sentido para elecciones
+ * ya finalizadas.
  */
 export function EleccionFinalizadaCard({ eleccion }: EleccionFinalizadaCardProps) {
   return (
@@ -40,13 +44,12 @@ export function EleccionFinalizadaCard({ eleccion }: EleccionFinalizadaCardProps
           {resultadoTexto(eleccion.resultado)}
         </div>
       </div>
-      <button
-        type="button"
-        onClick={() => console.log("Ver resultados", eleccion.id)}
+      <Link
+        href={`/elecciones/${eleccion.id}/resultados`}
         className="shrink-0 rounded-full bg-[#1f8fe0] px-5 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#1a7cc4]"
       >
         Ver
-      </button>
+      </Link>
     </div>
   );
 }
