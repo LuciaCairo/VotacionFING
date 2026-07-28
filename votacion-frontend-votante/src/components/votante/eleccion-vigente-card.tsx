@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { EleccionVigenteDTO } from "@/lib/api/elecciones";
 import { formatFechaCorta } from "@/lib/format";
 
@@ -9,8 +10,7 @@ interface EleccionVigenteCardProps {
  * Misma estructura/estilo que `ElectionCard` del admin (ver
  * votacion-frontend-admin/src/components/admin/election-card.tsx) —
  * fila con nombre + meta a la izquierda, acción a la derecha. El botón
- * "Ver" todavía no navega a ningún lado (el detalle/boleta es otro
- * prompt); por ahora solo loguea en consola.
+ * "Ver" navega al detalle/boleta (ver app/elecciones/[id]/page.tsx).
  */
 export function EleccionVigenteCard({ eleccion }: EleccionVigenteCardProps) {
   return (
@@ -30,13 +30,12 @@ export function EleccionVigenteCard({ eleccion }: EleccionVigenteCardProps) {
           Vigente hasta el {formatFechaCorta(eleccion.fecha_cierre)}
         </div>
       </div>
-      <button
-        type="button"
-        onClick={() => console.log("Ver elección", eleccion.id)}
+      <Link
+        href={`/elecciones/${eleccion.id}`}
         className="shrink-0 rounded-full bg-[#1f8fe0] px-5 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#1a7cc4]"
       >
         Ver
-      </button>
+      </Link>
     </div>
   );
 }

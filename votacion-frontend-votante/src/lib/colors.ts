@@ -32,3 +32,24 @@ export function colorResultadoLista(lista: {
   if (lista.esBlanco) return "#9aa7b3";
   return colorDeLista(lista.color, lista.indice);
 }
+
+/**
+ * El voto en blanco siempre tiene color #FFFFFF fijo (ver admin.service.ts,
+ * crearEleccion) y un admin puede elegir un color claro para cualquier otra
+ * lista: el texto no puede asumir blanco fijo, hay que decidir el contraste
+ * según el brillo real del color de fondo (luminancia relativa). Mismo
+ * criterio que en el panel de administración (ver
+ * votacion-frontend-admin/src/lib/colors.ts).
+ */
+export function esColorClaro(hex: string): boolean {
+  const valor = hex.replace("#", "");
+  if (valor.length !== 6) return false;
+
+  const r = parseInt(valor.slice(0, 2), 16);
+  const g = parseInt(valor.slice(2, 4), 16);
+  const b = parseInt(valor.slice(4, 6), 16);
+  if ([r, g, b].some((canal) => Number.isNaN(canal))) return false;
+
+  const luminancia = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminancia > 0.6;
+}
