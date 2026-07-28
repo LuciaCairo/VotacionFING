@@ -233,6 +233,63 @@ export async function descargarPadronCsv(): Promise<string> {
   return '﻿' + [encabezado, ...filas].join('\r\n');
 }
 
+// ─── GET /api/admin/elecciones/:id/participacion/descargar ──
+
+/**
+ * Genera un CSV RFC 4180 (BOM UTF-8) con el padrón completo (mismo criterio
+ * `activo: true` que `listarPadron`) cruzado contra quién votó en una
+ * elección finalizada: legajo, nombre, carrera, correo, voto (Sí/No) y
+ * fecha_voto. Nunca expone a qué lista votó cada persona — Participacion no
+ * tiene esa relación (ver modelo en schema.prisma, preserva el anonimato).
+ */
+export async function descargarParticipacionEleccionCsv(id: number): Promise<string> {
+  const eleccion = await prisma.eleccion.findUnique({
+    where: { id },
+    select: { estado: true },
+  });
+
+  if (!eleccion) {
+    throw new NoEncontradoError(`No existe una elección con id ${id}.`);
+  }
+  if (eleccion.estado !== 'finalizada') {
+    throw new ConflictoError(
+      'La elección todavía no finalizó; no se puede exportar la participación.',
+    );
+  }
+
+  const votantes = await prisma.votante.findMany({
+    where: { activo: true },
+    orderBy: { nombreCompleto: 'asc' },
+    select: {
+      legajo: true,
+      nombreCompleto: true,
+      carrera: true,
+      correo: true,
+      participaciones: {
+        where: { idEleccion: id },
+        select: { fechaVoto: true },
+      },
+    },
+  });
+
+  const encabezado = 'legajo,nombre_completo,carrera,correo,voto,fecha_voto';
+
+  const filas = votantes.map((v) => {
+    const participacion = v.participaciones[0];
+    return [
+      escaparCampoCSV(v.legajo),
+      escaparCampoCSV(v.nombreCompleto),
+      escaparCampoCSV(v.carrera),
+      escaparCampoCSV(v.correo),
+      escaparCampoCSV(participacion ? 'Sí' : 'No'),
+      escaparCampoCSV(participacion ? participacion.fechaVoto.toISOString() : ''),
+    ].join(',');
+  });
+
+  // BOM UTF-8 (﻿) para que Excel interprete correctamente los acentos.
+  return '﻿' + [encabezado, ...filas].join('\r\n');
+}
+
 // ─── DELETE /api/admin/elecciones/:id ───────────────────────
 
 /**

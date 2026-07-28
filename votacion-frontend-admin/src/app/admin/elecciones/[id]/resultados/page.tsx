@@ -3,7 +3,9 @@
 import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
+import { DescargarParticipacionButton } from "@/components/admin/eleccion/descargar-participacion-button";
 import { VerIntegridadButton } from "@/components/admin/eleccion/ver-integridad-button";
+import { useDescargarParticipacion } from "@/hooks/use-descargar-participacion";
 import { useResultadosEleccion } from "@/hooks/use-resultados-eleccion";
 import type {
   ListaResultadoDTO,
@@ -23,8 +25,11 @@ export default function ResultadosEleccionPage() {
   const idValido = Number.isFinite(id);
 
   const query = useResultadosEleccion(id);
+  const descargaParticipacion = useDescargarParticipacion(id);
   const sesionExpirada =
-    query.error instanceof ApiError && query.error.status === 401;
+    (query.error instanceof ApiError && query.error.status === 401) ||
+    (descargaParticipacion.error instanceof ApiError &&
+      descargaParticipacion.error.status === 401);
   const noFinalizada =
     query.error instanceof ApiError && query.error.status === 409;
 
@@ -53,8 +58,25 @@ export default function ResultadosEleccionPage() {
             </h1>
           </div>
 
-          {query.isSuccess && <VerIntegridadButton eleccionId={query.data.id} />}
+          {query.isSuccess && (
+            <div className="flex shrink-0 flex-wrap items-center gap-2.5">
+              <DescargarParticipacionButton
+                loading={descargaParticipacion.isPending}
+                onDownload={() => descargaParticipacion.mutate()}
+              />
+              <VerIntegridadButton eleccionId={query.data.id} />
+            </div>
+          )}
         </div>
+
+        {descargaParticipacion.isError && !sesionExpirada && (
+          <p
+            role="alert"
+            className="ml-[52px] mb-1 text-[13px] font-semibold text-[#9c2b2b]"
+          >
+            No pudimos descargar la participación: {descargaParticipacion.error.message}
+          </p>
+        )}
 
         <div className="min-h-0 flex-1 lg:flex lg:flex-col">
           {!idValido ? (

@@ -6,6 +6,7 @@ import {
   eliminarEleccion,
   listarPadron,
   descargarPadronCsv,
+  descargarParticipacionEleccionCsv,
   verificarIntegridadEleccion,
   consultarSaldoBlockchain,
 } from './admin.service.js';
@@ -71,6 +72,21 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
     const resultado = await verificarIntegridadEleccion(id, req.user, obtenerIp(req));
     return reply.code(200).send(resultado);
   });
+
+  // ─── GET /api/admin/elecciones/:id/participacion/descargar ──
+  app.get(
+    '/elecciones/:id/participacion/descargar',
+    { preHandler: soloAdmin },
+    async (req, reply) => {
+      const { id } = eleccionIdParamSchema.parse(req.params);
+      const csv = await descargarParticipacionEleccionCsv(id);
+      return reply
+        .code(200)
+        .header('Content-Type', 'text/csv; charset=utf-8')
+        .header('Content-Disposition', `attachment; filename="participacion_eleccion_${id}.csv"`)
+        .send(csv);
+    },
+  );
 
   // ─── GET /api/admin/blockchain/saldo ────────────────────────
   app.get('/blockchain/saldo', { preHandler: soloAdmin }, async (_req, reply) => {

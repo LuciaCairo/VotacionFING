@@ -1,4 +1,4 @@
-import { deleteJson, getJson, postJson } from "./http";
+import { deleteJson, getBlob, getJson, postJson } from "./http";
 
 /**
  * Contrato de GET /api/admin/elecciones
@@ -236,4 +236,14 @@ export function obtenerIntegridadRequest(
   return getJson<IntegridadEleccionDTO>(
     `/api/admin/elecciones/${id}/integridad`,
   );
+}
+
+/**
+ * GET /api/admin/elecciones/:id/participacion/descargar: CSV del padrón
+ * cruzado contra quién votó en esta elección (ver admin.service.ts,
+ * descargarParticipacionEleccionCsv). 409 si la elección todavía no
+ * finalizó — llega como `ApiError`, no como Blob.
+ */
+export function descargarParticipacionEleccionRequest(id: number): Promise<Blob> {
+  return getBlob(`/api/admin/elecciones/${id}/participacion/descargar`);
 }
