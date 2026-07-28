@@ -597,6 +597,14 @@ function construirSeccionResultados(e: EleccionParaIntegridad, bfa: DatosBfa): I
 }
 
 function construirSeccionParticipacion(e: EleccionParaIntegridad, bfa: DatosBfa): IntegridadSeccion {
+  // Igual que resultados: solo aplica a elecciones finalizadas. Mientras la
+  // eleccion sigue abierta, obtenerTodosLosVotos() todavia no es comparable
+  // (revierte hasta el cierre) y el conteo de participaciones en BD sigue
+  // cambiando voto a voto, asi que no hay nada estable para auditar todavia.
+  if (e.estado !== 'finalizada') {
+    return { estado: 'no_aplica', checks: [] };
+  }
+
   if (!bfa.tieneCodigo) {
     return {
       estado: 'discrepancias',
