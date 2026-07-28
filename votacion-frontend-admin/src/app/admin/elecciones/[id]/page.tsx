@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { EliminarEleccionDialog } from "@/components/admin/eleccion/eliminar-eleccion-dialog";
@@ -10,7 +9,7 @@ import { FechaCard } from "@/components/admin/eleccion/fecha-card";
 import { ListaRow } from "@/components/admin/eleccion/lista-row";
 import { VerIntegridadButton } from "@/components/admin/eleccion/ver-integridad-button";
 import { useEleccionDetalle } from "@/hooks/use-eleccion-detalle";
-import type { EleccionDetalleDTO } from "@/lib/api/elecciones";
+import { rutaVerEleccion, type EleccionDetalleDTO } from "@/lib/api/elecciones";
 import { ApiError } from "@/lib/api/errors";
 import { clearAdminSession } from "@/lib/auth/session";
 
@@ -23,6 +22,7 @@ export default function EleccionDetallePage() {
   const query = useEleccionDetalle(id);
   const sesionExpirada =
     query.error instanceof ApiError && query.error.status === 401;
+  const esFinalizada = query.isSuccess && query.data.estado === "finalizada";
 
   // Sesión expirada en cualquier request de esta pantalla: limpiamos el JWT
   // local y mandamos a /login (mismo patrón que el Home, ver app/admin/page.tsx).
@@ -32,6 +32,16 @@ export default function EleccionDetallePage() {
       router.replace("/login");
     }
   }, [sesionExpirada, router]);
+
+  // Esta pantalla es solo para creada/publicada — el Home ya linkea
+  // finalizadas a /resultados, pero se puede llegar acá con una URL escrita a
+  // mano. En vez de un placeholder muerto, redirigimos a donde sí existe la
+  // vista para ese estado.
+  useEffect(() => {
+    if (esFinalizada) {
+      router.replace(rutaVerEleccion("finalizada", query.data!.id));
+    }
+  }, [esFinalizada, query.data, router]);
 
   // Panel blanco-azulado sobre un fondo más oscuro: en pantallas grandes el
   // contenido (max-w-[920px]) necesita un límite visual propio, si no queda
@@ -94,14 +104,10 @@ export default function EleccionDetallePage() {
               mensaje={query.error.message}
               onRetry={() => query.refetch()}
             />
-          ) : query.isPending || sesionExpirada ? (
+          ) : query.isPending || sesionExpirada || esFinalizada ? (
             <DetalleSkeleton />
-          ) : query.isSuccess &&
-            (query.data.estado === "creada" ||
-              query.data.estado === "publicada") ? (
-            <EleccionDetalleLayout eleccion={query.data} />
           ) : query.isSuccess ? (
-            <EstadoNoDisponible eleccion={query.data} />
+            <EleccionDetalleLayout eleccion={query.data} />
           ) : null}
         </div>
       </div>
@@ -144,30 +150,6 @@ function EleccionDetalleLayout({ eleccion }: { eleccion: EleccionDetalleDTO }) {
           <EstadoEleccionCard eleccion={eleccion} />
         </div>
       </div>
-    </div>
-  );
-}
-
-/**
- * Placeholder neutro para elecciones "finalizada": el diseño de esa card
- * todavía no existe (ver brief). El Home ya no linkea acá para ese estado
- * (usa /resultados), así que esta rama solo se pisa con una URL escrita a
- * mano.
- */
-function EstadoNoDisponible({ eleccion }: { eleccion: EleccionDetalleDTO }) {
-  return (
-    <div className="rounded-xl border border-dashed border-[#d7dde3] bg-white p-8 text-center">
-      <p className="text-[14.5px] font-bold text-[#0a2540]">{eleccion.nombre}</p>
-      <p className="mt-2 text-[13.5px] text-[#5b6b7c]">
-        La vista de detalle para elecciones en estado &quot;{eleccion.estado}
-        &quot; todavía no está disponible.
-      </p>
-      <Link
-        href={rutaVolverAlPanel(eleccion.estado)}
-        className="mt-4 inline-block rounded-full bg-[#1f8fe0] px-5 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#1a7cc4]"
-      >
-        Volver al panel
-      </Link>
     </div>
   );
 }
