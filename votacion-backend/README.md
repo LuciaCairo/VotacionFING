@@ -23,7 +23,9 @@ El backend está **completo y probado**:
 - ✅ **Módulo admin completo**: CRUD de elecciones (`GET/POST /api/admin/elecciones`,
   `GET/DELETE /api/admin/elecciones/:id`), auditoría de integridad BD vs. BFA
   (`GET /api/admin/elecciones/:id/integridad`), Padrón Electoral (`GET /api/admin/padron`
-  y `/padron/descargar`), saldo de la cuenta blockchain (`GET /api/admin/blockchain/saldo`).
+  y `/padron/descargar`), descarga de participación por elección finalizada
+  (`GET /api/admin/elecciones/:id/participacion/descargar`), saldo de la cuenta
+  blockchain (`GET /api/admin/blockchain/saldo`).
 - ✅ **Módulo votante completo**: elecciones vigentes/finalizadas, detalle, emisión de
   voto y comprobante (`/api/votante/elecciones/...`).
 - ✅ Endpoint compartido admin/votante de resultados de una elección finalizada
@@ -31,8 +33,9 @@ El backend está **completo y probado**:
 - ✅ Cron jobs de transición de estados de elecciones.
 - ✅ Seed de datos de prueba.
 
-Módulo pendiente: **frontend votante** (el frontend admin ya está completo y consume
-esta API en su totalidad).
+Los dos frontends (admin y votante) ya están completos y consumen esta API en
+su totalidad — ver [`../votacion-frontend-admin/README.md`](../votacion-frontend-admin/README.md)
+y [`../votacion-frontend-votante/README.md`](../votacion-frontend-votante/README.md).
 
 ---
 

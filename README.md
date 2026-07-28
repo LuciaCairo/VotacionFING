@@ -17,18 +17,20 @@ transparencia verificable a los resultados, manteniendo el anonimato del voto.
 
 ```
 votacion-backend/          API REST (Fastify + Prisma/PostgreSQL + Redis + ethers.js/BFA)
-votacion-frontend-admin/   Panel de administración (Next.js)
+votacion-frontend-admin/   Panel de administración (Next.js, puerto 8081)
+votacion-frontend-votante/ App del votante (Next.js, puerto 8082)
 ```
 
 | Módulo | Estado |
 |---|---|
 | Backend | ✅ Completo — auth, admin (elecciones, integridad, padrón) y votante |
 | Frontend admin | ✅ Completo — login, elecciones, resultados, integridad, padrón, crear elección |
-| Frontend votante | ⏳ Pendiente — todavía no se empezó |
+| Frontend votante | ✅ Completo — login, elecciones vigentes/finalizadas, boleta y voto, comprobante, resultados, soporte |
 
 Cada subproyecto tiene su propio README con instrucciones de puesta en
-marcha: [`votacion-backend/README.md`](votacion-backend/README.md) y
-[`votacion-frontend-admin/README.md`](votacion-frontend-admin/README.md).
+marcha: [`votacion-backend/README.md`](votacion-backend/README.md),
+[`votacion-frontend-admin/README.md`](votacion-frontend-admin/README.md) y
+[`votacion-frontend-votante/README.md`](votacion-frontend-votante/README.md).
 
 ## Arquitectura, en resumen
 
@@ -57,6 +59,12 @@ npm run dev
 
 # Frontend admin (puerto 8081), en otra terminal
 cd votacion-frontend-admin
+npm install
+cp .env.example .env.local
+npm run dev
+
+# Frontend votante (puerto 8082), en otra terminal
+cd votacion-frontend-votante
 npm install
 cp .env.example .env.local
 npm run dev

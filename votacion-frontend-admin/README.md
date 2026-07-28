@@ -20,14 +20,16 @@ Panel de administración **completo**, sin pantallas pendientes:
 - ✅ Login (`/login`), con guard de sesión para todo `/admin/*`.
 - ✅ Home (`/admin`): elecciones agrupadas por estado (creada / publicada / finalizada).
 - ✅ Detalle de elección creada/publicada (`/admin/elecciones/[id]`).
-- ✅ Resultados de elección finalizada (`/admin/elecciones/[id]/resultados`).
+- ✅ Resultados de elección finalizada (`/admin/elecciones/[id]/resultados`), con
+  descarga de CSV de participación (quién votó y quién no).
 - ✅ Control de Integridad — auditoría BD vs. contrato en BFA
   (`/admin/elecciones/[id]/integridad`).
 - ✅ Padrón Electoral — búsqueda, paginado y descarga de CSV (`/admin/padron`).
 - ✅ Crear Elección — formulario, listas con color, confirmación de inmutabilidad
   (`/admin/elecciones/nueva`).
 
-Pendiente: el **módulo votante** (otro frontend, todavía no se empezó).
+El **módulo votante** es otro frontend (`../votacion-frontend-votante`), también
+completo — ver su propio README.
 
 ---
 
