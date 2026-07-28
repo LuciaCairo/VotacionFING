@@ -31,6 +31,11 @@ export function LoginForm() {
   const mutation = useLoginVotante();
   const existingSession = useVotanteSession();
   const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const {
     register,
@@ -53,10 +58,14 @@ export function LoginForm() {
   // formulario de login: mandamos directo al sistema. `existingSession` es
   // reactivo (useSyncExternalStore), así que el chequeo también gatea el
   // render más abajo y evita que el formulario llegue a verse un instante
-  // antes de redirigir.
+  // antes de redirigir. `mounted` retrasa esa decisión un render (mismo
+  // patrón que VotanteGuard, ver components/votante/votante-guard.tsx): en
+  // el primer render de hidratación `existingSession` siempre da `null`
+  // aunque haya sesión guardada, así que sin este retraso se vería el
+  // formulario completo un instante antes de saltar a "Redirigiendo...".
   useEffect(() => {
-    if (existingSession) router.replace(POST_LOGIN_REDIRECT);
-  }, [existingSession, router]);
+    if (mounted && existingSession) router.replace(POST_LOGIN_REDIRECT);
+  }, [mounted, existingSession, router]);
 
   // Al loguear con éxito: persistimos la sesión y, tras la animación,
   // redirigimos.
@@ -103,6 +112,10 @@ export function LoginForm() {
     setValue("legajo", DEV_VOTANTE_CREDENTIALS.legajo);
     setValue("password", DEV_VOTANTE_CREDENTIALS.password);
     handleSubmit(onSubmit)();
+  }
+
+  if (!mounted) {
+    return null;
   }
 
   if (existingSession) {
