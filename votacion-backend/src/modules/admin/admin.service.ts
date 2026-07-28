@@ -686,6 +686,16 @@ export async function verificarIntegridadEleccion(
   }
   const contratoAddress = eleccion.contratoAddress;
 
+  // Una address con formato invalido (mal cargada en BD, typo, etc.) hace que
+  // ethers la trate como nombre ENS y dispare un error de resolucion/red que
+  // no tiene nada que ver con que BFA este caido — se distingue aparte para
+  // no confundir "direccion mal guardada" con "no se pudo conectar a BFA".
+  if (!ethers.isAddress(contratoAddress)) {
+    throw new ConflictoError(
+      `La dirección del contrato registrada en la base de datos (${contratoAddress}) no tiene un formato válido; no se puede verificar su integridad.`,
+    );
+  }
+
   let bfa: DatosBfa;
   try {
     const tieneCodigo = await contratoTieneCodigo(contratoAddress);
