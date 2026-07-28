@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -30,6 +30,11 @@ export function LoginForm() {
   const mutation = useLoginAdmin();
   const existingSession = useAdminSession();
   const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const {
     register,
@@ -52,10 +57,14 @@ export function LoginForm() {
   // el formulario de login: mandamos directo al panel. `existingSession` es
   // reactivo (useSyncExternalStore), así que el chequeo también gatea el
   // render más abajo y evita que el formulario llegue a verse un instante
-  // antes de redirigir.
+  // antes de redirigir. `mounted` retrasa esa decisión un render (mismo
+  // patrón que AdminGuard, ver components/admin/admin-guard.tsx): en el
+  // primer render de hidratación `existingSession` siempre da `null` aunque
+  // haya sesión guardada, así que sin este retraso se vería el formulario
+  // completo un instante antes de saltar a la pantalla de "Redirigiendo...".
   useEffect(() => {
-    if (existingSession) router.replace(POST_LOGIN_REDIRECT);
-  }, [existingSession, router]);
+    if (mounted && existingSession) router.replace(POST_LOGIN_REDIRECT);
+  }, [mounted, existingSession, router]);
 
   // Al loguear con éxito: persistimos la sesión y, tras la animación,
   // redirigimos al panel.
@@ -102,6 +111,10 @@ export function LoginForm() {
     setValue("correo", DEV_ADMIN_CREDENTIALS.correo);
     setValue("password", DEV_ADMIN_CREDENTIALS.password);
     handleSubmit(onSubmit)();
+  }
+
+  if (!mounted) {
+    return null;
   }
 
   if (existingSession) {
