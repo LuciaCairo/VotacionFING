@@ -262,11 +262,20 @@ function formatFechaHoraLocal(fecha: Date): string {
 }
 
 /**
- * Genera un CSV RFC 4180 (BOM UTF-8) con el padrón completo (mismo criterio
- * `activo: true` que `listarPadron`) cruzado contra quién votó en una
- * elección finalizada: legajo, nombre, carrera, correo, voto (Sí/No) y
- * fecha_voto. Nunca expone a qué lista votó cada persona — Participacion no
- * tiene esa relación (ver modelo en schema.prisma, preserva el anonimato).
+ * Genera un CSV RFC 4180 (BOM UTF-8) con el padrón cruzado contra quién votó
+ * en una elección finalizada: legajo, nombre, carrera, correo, activo,
+ * voto (Sí/No) y fecha_voto. Nunca expone a qué lista votó cada persona —
+ * Participacion no tiene esa relación (ver modelo en schema.prisma, preserva
+ * el anonimato).
+ *
+ * A diferencia de `listarPadron` (que solo muestra el padrón *actual*), acá
+ * se incluye a cualquier votante que además tenga una Participacion en esta
+ * elección aunque hoy figure `activo: false` — el padrón se recarga cada
+ * semestre (bajas, graduados) y una elección finalizada es un dato ya
+ * cerrado: si alguien votó, esa participación quedó grabada en la blockchain
+ * y no puede desaparecer del reporte de auditoría solo porque después se dio
+ * de baja. La columna `activo` deja explícito ese estado actual para quien
+ * audite el CSV.
  */
 export async function descargarParticipacionEleccionCsv(id: number): Promise<string> {
   const eleccion = await prisma.eleccion.findUnique({
@@ -284,13 +293,14 @@ export async function descargarParticipacionEleccionCsv(id: number): Promise<str
   }
 
   const votantes = await prisma.votante.findMany({
-    where: { activo: true },
+    where: { OR: [{ activo: true }, { participaciones: { some: { idEleccion: id } } }] },
     orderBy: { nombreCompleto: 'asc' },
     select: {
       legajo: true,
       nombreCompleto: true,
       carrera: true,
       correo: true,
+      activo: true,
       participaciones: {
         where: { idEleccion: id },
         select: { fechaVoto: true },
@@ -298,7 +308,7 @@ export async function descargarParticipacionEleccionCsv(id: number): Promise<str
     },
   });
 
-  const encabezado = 'legajo,nombre_completo,carrera,correo,voto,fecha_voto';
+  const encabezado = 'legajo,nombre_completo,carrera,correo,activo,voto,fecha_voto';
 
   const filas = votantes.map((v) => {
     const participacion = v.participaciones[0];
@@ -307,6 +317,7 @@ export async function descargarParticipacionEleccionCsv(id: number): Promise<str
       escaparCampoCSV(v.nombreCompleto),
       escaparCampoCSV(v.carrera),
       escaparCampoCSV(v.correo),
+      escaparCampoCSV(String(v.activo)),
       escaparCampoCSV(participacion ? 'Sí' : 'No'),
       escaparCampoCSV(participacion ? formatFechaHoraLocal(participacion.fechaVoto) : ''),
     ].join(',');

@@ -77,6 +77,11 @@ model Eleccion {
   resultadoTipo   ResultadoTipo? @map("resultado_tipo")
   idListaGanadora Int?           @map("id_lista_ganadora")
   snapshotAt      DateTime?      @map("snapshot_at")
+  // Tamanio del padron activo al momento del snapshot: sin esto, el % de
+  // participacion de una eleccion finalizada quedaria recalculandose contra
+  // el padron actual (que cambia con cada recarga semestral) en vez de
+  // quedar fijo como el resto de los datos de una eleccion ya cerrada.
+  totalPadron     Int?           @map("total_padron")
 
   listas          Lista[]
   participaciones Participacion[]

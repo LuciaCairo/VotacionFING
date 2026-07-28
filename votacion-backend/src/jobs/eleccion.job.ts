@@ -44,6 +44,12 @@ async function tomarSnapshotResultados(idEleccion: number): Promise<void> {
     const resultadoTipo = listasConMax.length === 1 ? 'ganador_unico' : 'empate';
     const idListaGanadora = listasConMax.length === 1 ? listasConMax[0].lista.id : null;
 
+    // Se congela junto con el resto del snapshot: si no, el % de
+    // participacion de una eleccion ya finalizada seguiria cambiando cada
+    // vez que se recarga el padron (bajas/graduados), rompiendo la
+    // inmutabilidad que se espera del resto de sus datos.
+    const totalPadron = await prisma.votante.count({ where: { activo: true } });
+
     await prisma.$transaction([
       ...votosPorLista.map((v) =>
         prisma.resultado.upsert({
@@ -54,7 +60,7 @@ async function tomarSnapshotResultados(idEleccion: number): Promise<void> {
       ),
       prisma.eleccion.update({
         where: { id: idEleccion },
-        data: { totalVotos, resultadoTipo, idListaGanadora, snapshotAt: new Date() },
+        data: { totalVotos, resultadoTipo, idListaGanadora, totalPadron, snapshotAt: new Date() },
       }),
     ]);
 

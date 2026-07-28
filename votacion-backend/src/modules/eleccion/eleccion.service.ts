@@ -26,6 +26,7 @@ export async function obtenerResultados(eleccionId: number) {
       fechaCierre: true,
       estado: true,
       snapshotAt: true,
+      totalPadron: true,
       listas: {
         orderBy: { indice: 'asc' },
         select: {
@@ -76,7 +77,12 @@ export async function obtenerResultados(eleccionId: number) {
     porcentaje: totalVotos > 0 ? redondear((l.votos / totalVotos) * 100) : 0,
   }));
 
-  const totalPadron = await prisma.votante.count({ where: { activo: true } });
+  // Congelado al tomar el snapshot (ver tomarSnapshotResultados en
+  // eleccion.job.ts) — no se recalcula en vivo contra el padron actual, que
+  // cambia con cada recarga semestral y rompería la inmutabilidad de una
+  // elección ya finalizada. El fallback en vivo solo cubre elecciones
+  // finalizadas antes de que este campo existiera (totalPadron = null).
+  const totalPadron = eleccion.totalPadron ?? (await prisma.votante.count({ where: { activo: true } }));
 
   const participacion = {
     total_votos: totalVotos,
