@@ -235,6 +235,32 @@ export async function descargarPadronCsv(): Promise<string> {
 
 // ─── GET /api/admin/elecciones/:id/participacion/descargar ──
 
+const ZONA_HORARIA_LOCAL = 'America/Argentina/Mendoza';
+
+/**
+ * Formatea una fecha en hora local de Mendoza (UTC-3, sin horario de verano)
+ * como 'YYYY-MM-DD HH:mm:ss'. Todo el resto de la app manda fechas como ISO
+ * UTC y deja que el frontend las convierta a hora local para mostrarlas (ver
+ * `formatFechaHora` en ambos frontends) — acá no hay frontend de por medio
+ * (el CSV se abre directo en Excel), así que la conversión hay que hacerla
+ * server-side explícitamente contra la zona horaria de la institución, en vez
+ * de asumir que el proceso de Node corre en esa misma zona horaria.
+ */
+function formatFechaHoraLocal(fecha: Date): string {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: ZONA_HORARIA_LOCAL,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(fecha);
+  const obtener = (tipo: string) => partes.find((p) => p.type === tipo)?.value ?? '';
+  return `${obtener('year')}-${obtener('month')}-${obtener('day')} ${obtener('hour')}:${obtener('minute')}:${obtener('second')}`;
+}
+
 /**
  * Genera un CSV RFC 4180 (BOM UTF-8) con el padrón completo (mismo criterio
  * `activo: true` que `listarPadron`) cruzado contra quién votó en una
@@ -282,7 +308,7 @@ export async function descargarParticipacionEleccionCsv(id: number): Promise<str
       escaparCampoCSV(v.carrera),
       escaparCampoCSV(v.correo),
       escaparCampoCSV(participacion ? 'Sí' : 'No'),
-      escaparCampoCSV(participacion ? participacion.fechaVoto.toISOString() : ''),
+      escaparCampoCSV(participacion ? formatFechaHoraLocal(participacion.fechaVoto) : ''),
     ].join(',');
   });
 
