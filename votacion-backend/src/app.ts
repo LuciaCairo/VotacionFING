@@ -20,7 +20,13 @@ import { eleccionRoutes } from './modules/eleccion/eleccion.routes.js';
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
     loggerInstance: logger,
-    trustProxy: true, // detras de NGINX
+    // No hay reverse proxy real delante todavia. `true` confia en CUALQUIER
+    // cantidad de saltos en X-Forwarded-For (incluido el valor que manda el
+    // propio cliente), lo que permite falsificar la IP usada por el rate
+    // limit y los logs de auditoria. Cuando se despliegue detras de un
+    // proxy real, cambiar esto a la IP/CIDR especifica de ese proxy (nunca
+    // `true`) para que solo se confie en el salto conocido.
+    trustProxy: false,
     bodyLimit: 1 * 1024 * 1024, // 1 MB
   });
 

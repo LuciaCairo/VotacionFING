@@ -1,7 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { loginVotanteSchema, loginAdminSchema } from './auth.schemas.js';
 import { loginVotante, loginAdmin, logout } from './auth.service.js';
-import { obtenerIp } from '../../utils/request.js';
 
 /**
  * Rutas de autenticacion.
@@ -13,14 +12,14 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
   // ─── Login votante ───────────────────────────────────────────
   app.post('/login/votante', async (req, reply) => {
     const input = loginVotanteSchema.parse(req.body);
-    const resultado = await loginVotante(app, input, obtenerIp(req));
+    const resultado = await loginVotante(app, input, req.ip);
     return reply.code(200).send(resultado);
   });
 
   // ─── Login admin ─────────────────────────────────────────────
   app.post('/login/admin', async (req, reply) => {
     const input = loginAdminSchema.parse(req.body);
-    const resultado = await loginAdmin(app, input, obtenerIp(req));
+    const resultado = await loginAdmin(app, input, req.ip);
     return reply.code(200).send(resultado);
   });
 
@@ -29,7 +28,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     '/logout',
     { preHandler: [app.autenticar] },
     async (req, reply) => {
-      await logout(req.user, obtenerIp(req));
+      await logout(req.user, req.ip);
       return reply.code(200).send({ mensaje: 'Sesión cerrada correctamente' });
     },
   );

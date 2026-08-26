@@ -11,7 +11,6 @@ import {
   consultarSaldoBlockchain,
 } from './admin.service.js';
 import { crearEleccionSchema, eleccionIdParamSchema, padronQuerySchema } from './admin.schemas.js';
-import { obtenerIp } from '../../utils/request.js';
 
 /**
  * Rutas de administración. Todas requieren JWT con rol "administrador".
@@ -55,21 +54,21 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   // ─── POST /api/admin/elecciones ─────────────────────────────
   app.post('/elecciones', { preHandler: soloAdmin }, async (req, reply) => {
     const input = crearEleccionSchema.parse(req.body);
-    const resultado = await crearEleccion(input, req.user, obtenerIp(req));
+    const resultado = await crearEleccion(input, req.user, req.ip);
     return reply.code(201).send(resultado);
   });
 
   // ─── DELETE /api/admin/elecciones/:id ───────────────────────
   app.delete('/elecciones/:id', { preHandler: soloAdmin }, async (req, reply) => {
     const { id } = eleccionIdParamSchema.parse(req.params);
-    await eliminarEleccion(id, req.user, obtenerIp(req));
+    await eliminarEleccion(id, req.user, req.ip);
     return reply.code(200).send({ mensaje: 'Elección eliminada correctamente.' });
   });
 
   // ─── GET /api/admin/elecciones/:id/integridad ───────────────
   app.get('/elecciones/:id/integridad', { preHandler: soloAdmin }, async (req, reply) => {
     const { id } = eleccionIdParamSchema.parse(req.params);
-    const resultado = await verificarIntegridadEleccion(id, req.user, obtenerIp(req));
+    const resultado = await verificarIntegridadEleccion(id, req.user, req.ip);
     return reply.code(200).send(resultado);
   });
 
