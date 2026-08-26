@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { env } from './config/env.js';
 import { logger } from './config/logger.js';
@@ -36,6 +37,12 @@ export async function buildApp(): Promise<FastifyInstance> {
     credentials: true,
     methods: ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'OPTIONS'],
   });
+
+  // Cabeceras de seguridad HTTP (HSTS, X-Content-Type-Options, X-Frame-Options,
+  // Referrer-Policy, etc.). CSP desactivada a proposito: esta API solo
+  // devuelve JSON/CSV, nunca HTML, asi que la CSP por defecto de helmet
+  // (pensada para paginas) no protege nada real aca y solo agrega ruido.
+  await app.register(helmet, { contentSecurityPolicy: false });
 
   // Rate limit global suave. El bloqueo especifico de login (5 intentos)
   // se maneja aparte con Redis dentro del modulo auth.
