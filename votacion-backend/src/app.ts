@@ -20,7 +20,11 @@ import { eleccionRoutes } from './modules/eleccion/eleccion.routes.js';
  */
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
-    loggerInstance: logger,
+    // `logger` (no `loggerInstance`, que es una opcion de Fastify v5 y no
+    // existe en esta v4 instalada) es la clave real para que Fastify use
+    // nuestro logger de Pino (con redaccion de passwords/tokens/claves) en
+    // vez de crear uno propio sin esa redaccion.
+    logger,
     // No hay reverse proxy real delante todavia. `true` confia en CUALQUIER
     // cantidad de saltos en X-Forwarded-For (incluido el valor que manda el
     // propio cliente), lo que permite falsificar la IP usada por el rate
