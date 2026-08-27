@@ -12,6 +12,13 @@ const prisma = new PrismaClient();
  * esto es solo para poder probar el backend localmente.
  */
 async function main() {
+  // Credenciales hardcodeadas (admin1234/votante1234) solo son aceptables en
+  // desarrollo. Corta el seed si por error se apunta a produccion, en vez de
+  // confiar en que nadie lo corra ahi por accidente.
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('El seed de desarrollo no puede correr con NODE_ENV=production.');
+  }
+
   const rounds = 12;
 
   // ─── Administrador ─────────────────────────────────────────

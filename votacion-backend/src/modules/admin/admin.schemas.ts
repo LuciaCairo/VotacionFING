@@ -21,7 +21,8 @@ export const crearEleccionSchema = z.object({
   fecha_cierre: z.string().datetime({ message: 'fecha_cierre debe ser una fecha ISO 8601 válida' }),
   listas: z
     .array(listaInputSchema)
-    .min(2, 'La elección debe tener al menos 2 listas'),
+    .min(2, 'La elección debe tener al menos 2 listas')
+    .max(20, 'La elección no puede tener más de 20 listas'),
 });
 
 export type CrearEleccionInput = z.infer<typeof crearEleccionSchema>;
