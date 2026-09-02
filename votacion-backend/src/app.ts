@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -18,13 +18,13 @@ import { eleccionRoutes } from './modules/eleccion/eleccion.routes.js';
  * Construye la instancia de Fastify con todos los plugins y rutas.
  * Separado de la escucha (server.ts) para facilitar testing.
  */
-export async function buildApp(): Promise<FastifyInstance> {
+export async function buildApp() {
   const app = Fastify({
-    // `logger` (no `loggerInstance`, que es una opcion de Fastify v5 y no
-    // existe en esta v4 instalada) es la clave real para que Fastify use
-    // nuestro logger de Pino (con redaccion de passwords/tokens/claves) en
-    // vez de crear uno propio sin esa redaccion.
-    logger,
+    // `loggerInstance` (no `logger`, que en Fastify v5 solo acepta un objeto
+    // de configuracion, no una instancia ya creada) es la clave real para que
+    // Fastify use nuestro logger de Pino (con redaccion de passwords/tokens/
+    // claves) en vez de crear uno propio sin esa redaccion.
+    loggerInstance: logger,
     // No hay reverse proxy real delante todavia. `true` confia en CUALQUIER
     // cantidad de saltos en X-Forwarded-For (incluido el valor que manda el
     // propio cliente), lo que permite falsificar la IP usada por el rate

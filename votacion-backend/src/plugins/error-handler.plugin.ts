@@ -1,4 +1,5 @@
 import fp from 'fastify-plugin';
+import type { FastifyError } from 'fastify';
 import { ZodError } from 'zod';
 import { Prisma } from '@prisma/client';
 import { AppError } from '../utils/errors.js';
@@ -10,7 +11,7 @@ import { logger } from '../config/logger.js';
  * sin filtrar detalles internos al cliente.
  */
 export default fp(async (app) => {
-  app.setErrorHandler((error, req, reply) => {
+  app.setErrorHandler((error: FastifyError, req, reply) => {
     // Errores de dominio controlados.
     if (error instanceof AppError) {
       const body: Record<string, unknown> = { error: error.message };
