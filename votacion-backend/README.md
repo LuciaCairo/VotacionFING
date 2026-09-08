@@ -151,4 +151,28 @@ prisma/
 - `bcryptjs` se usa en lugar de `bcrypt` para evitar compilación nativa; ambos son
   intercambiables (misma API). Si preferís `bcrypt`, cambiá el import en
   `src/utils/password.ts` y `prisma/seed.ts`.
-```
+- `npm audit`: **0 vulnerabilidades** (última corrida). Se actualizó `@fastify/jwt`
+  a v10, `fastify` a v5 (con el resto del ecosistema — cors, helmet, rate-limit,
+  fastify-plugin, pino — alineado a esa major) y `node-cron` a v4. Detalle completo
+  del proceso y de los 3 archivos que hubo que ajustar por el cambio de API de
+  Fastify v5 en [`../docs/informe-backend-npm-audit.html`](../docs/informe-backend-npm-audit.html).
+- **Concurrencia en `blockchain.service.ts`**: hay una única wallet (`signer`) que
+  firma todas las transacciones del sistema (votos y deploys por igual). Los envíos
+  se serializan y el nonce se cuenta en memoria en vez de volver a preguntarle a la
+  red en cada transacción — preguntarle a BFA en cada envío no alcanza (es una red
+  de consorcio, con más de un nodo detrás de un balanceador, y un nodo puede no
+  estar al día con lo que otro acaba de aceptar). Verificado con votos concurrentes
+  reales contra BFA; ver [`../docs/informe-nonce-blockchain.html`](../docs/informe-nonce-blockchain.html)
+  para la bitácora completa (incluye un primer intento que parecía andar y falló
+  igual bajo más carga). Limitación conocida: esto serializa dentro de un único
+  proceso de Node — correr el backend en más de una instancia a la vez
+  reintroduciría la condición de carrera (haría falta un lock compartido, ej. Redis).
+- Limitaciones de seguridad conocidas, documentadas mas no mitigadas (decisión
+  explícita, fuera del alcance de esta tesina): el backend puede calcular el hash
+  anónimo de cualquier votante sin su clave (firmante único → voto fantasma
+  teórico si el backend estuviera comprometido); los roles de BD/Redis no siguen
+  mínimo privilegio; se confía en que el nodo RPC de BFA no mienta (inherente a
+  blockchain permisionada); un admin puede vaciar el saldo de gas creando
+  elecciones sin límite, y un votante puede spamear intentos de voto propios
+  mientras el primero no confirma. Detalle de cada uno en
+  [`../docs/informe-nonce-blockchain.html`](../docs/informe-nonce-blockchain.html).

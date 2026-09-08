@@ -46,6 +46,16 @@ marcha: [`votacion-backend/README.md`](votacion-backend/README.md),
   `localStorage` en el frontend, mandado como header `Authorization: Bearer`
   en cada llamada autenticada.
 
+## Seguridad
+
+Se corrió `npm audit` en las tres apps (llevándolas a 0 vulnerabilidades reportadas) y una revisión manual encontró y corrigió una condición de carrera real en cómo el backend firma transacciones en BFA: bajo votos concurrentes, dos transacciones podían pedir el mismo número de secuencia (nonce) y una quedaba rechazada. Todo el proceso, con las pruebas reales de concurrencia contra la blockchain, está documentado en [`docs/`](docs/):
+
+- [`docs/informe-backend-npm-audit.html`](docs/informe-backend-npm-audit.html) — backend: 6 → 0 vulnerabilidades (incluye el bump de Fastify a v5 y los 3 archivos que hubo que ajustar).
+- [`docs/informe-frontends-npm-audit.html`](docs/informe-frontends-npm-audit.html) — ambos frontends: 9 → 0 vulnerabilidades, solo bump de versión, sin cambios de código.
+- [`docs/informe-nonce-blockchain.html`](docs/informe-nonce-blockchain.html) — la condición de carrera del nonce: cómo se encontró, los dos intentos de arreglo y las pruebas reales que confirmaron el segundo.
+
+Limitaciones de seguridad conocidas, con decisión explícita de documentar (no mitigar) por estar fuera del alcance de esta tesina — detalle en el último informe de arriba: voto fantasma por firmante único, roles de base de datos sin mínimo privilegio, confianza en el nodo RPC de BFA, y DoS económico por creación de elecciones (admin) o votos repetidos (votante) sin límite.
+
 ## Puesta en marcha rápida
 
 ```bash
