@@ -35,6 +35,62 @@ export function hashVotante(legajo: string, idEleccion: number): string {
   return ethers.keccak256(ethers.toUtf8Bytes(legajo + idEleccion + env.SALT_SECRETO));
 }
 
+// ─── Cola de envio: serializa firmar+enviar Y lleva el nonce ─
+// Hay un unico signer para todo el backend (votos y deploys por igual).
+//
+// Primer intento (descartado): una cola que solo ordenaba las llamadas y
+// dejaba que cada una le preguntara al nodo de BFA "cual es el proximo
+// nonce" (pending) al enviar. Probado con votos concurrentes reales, fallo
+// igual con `REPLACEMENT_UNDERPRICED` ("replacement transaction
+// underpriced") — BFA es una red de consorcio, probablemente con mas de un
+// nodo detras de un balanceador, y el nodo que atiende el segundo pedido
+// puede no haberse enterado todavia del primero: devuelve el mismo numero
+// aunque los pedidos ya lleguen en orden de nuestro lado.
+//
+// Por eso ahora el nonce se cuenta EN MEMORIA en vez de volver a preguntarle
+// a la red en cada envio: se sincroniza una sola vez (o de nuevo si algo
+// salio mal) y despues se incrementa localmente, sin depender de que el
+// nodo consultado este al dia con el envio anterior.
+let colaEnvio: Promise<void> = Promise.resolve();
+let siguienteNonce: number | null = null;
+
+/**
+ * Encola una operacion de firma+envio, pasandole el nonce que le toca.
+ * Solo serializa el paso de enviar (`construirTx`) — la confirmacion
+ * (`tx.wait()`) puede seguir pasando en paralelo despues, asi que el costo
+ * en velocidad es minimo.
+ *
+ * Si `construirTx` falla, se descarta el contador local (se resincroniza
+ * con la red en el proximo envio) por si el estado quedo dudoso — por
+ * ejemplo, si la red igual llego a recibir la transaccion pese al error
+ * reportado.
+ */
+function encolarEnvio<T>(construirTx: (nonce: number) => Promise<T>): Promise<T> {
+  const tarea = async (): Promise<T> => {
+    if (siguienteNonce === null) {
+      siguienteNonce = await provider.getTransactionCount(env.BACKEND_ADDRESS, 'pending');
+    }
+    const nonce = siguienteNonce;
+    try {
+      const resultado = await construirTx(nonce);
+      siguienteNonce = nonce + 1;
+      return resultado;
+    } catch (err) {
+      siguienteNonce = null;
+      throw err;
+    }
+  };
+
+  const resultado = colaEnvio.then(tarea, tarea);
+  // Seguir la cola pase lo que pase (exito o error) para no bloquear el
+  // resto para siempre si una transaccion falla.
+  colaEnvio = resultado.then(
+    () => undefined,
+    () => undefined,
+  );
+  return resultado;
+}
+
 /**
  * Despliega un contrato Votacion nuevo para una eleccion.
  * Las listas y fechas quedan inmutables en la blockchain.
@@ -56,13 +112,17 @@ export async function desplegarContrato(params: {
   try {
     const factory = new ethers.ContractFactory(VOTACION_ABI, VOTACION_BYTECODE, signer);
 
-    const contrato = await factory.deploy(
-      params.nombreEleccion,
-      params.listas,
-      env.BACKEND_ADDRESS,
-      params.fechaAperturaUnix,
-      params.fechaCierreUnix,
-      { gasLimit: env.BFA_DEPLOY_GAS_LIMIT },
+    // Encolado: ver encolarEnvio arriba — evita que este deploy y un voto
+    // concurrente pidan el mismo nonce al mismo tiempo.
+    const contrato = await encolarEnvio((nonce) =>
+      factory.deploy(
+        params.nombreEleccion,
+        params.listas,
+        env.BACKEND_ADDRESS,
+        params.fechaAperturaUnix,
+        params.fechaCierreUnix,
+        { gasLimit: env.BFA_DEPLOY_GAS_LIMIT, nonce },
+      ),
     );
 
     const recibo = await contrato.deploymentTransaction()?.wait();
@@ -100,7 +160,11 @@ export async function registrarVoto(params: {
   hash: string;
 }): Promise<{ txHash: string }> {
   const contrato = contratoEscritura(params.contratoAddress);
-  const tx = await contrato.votar(params.idLista, params.hash);
+  // Encolado: ver encolarEnvio arriba — evita que dos votos (o un voto y un
+  // deploy) concurrentes pidan el mismo nonce al mismo tiempo.
+  const tx = await encolarEnvio((nonce) =>
+    contrato.votar(params.idLista, params.hash, { nonce }),
+  );
   const recibo = await tx.wait();
   return { txHash: recibo?.hash ?? tx.hash };
 }
