@@ -23,7 +23,16 @@ const csp = [
   "form-action 'self'",
 ].join("; ");
 
+// Destino del proxy /api/* (ver rewrites abajo). Solo lo usa el servidor de
+// Next, nunca el navegador. Sirve para exponer la app por un túnel con una
+// sola URL por frontend: con NEXT_PUBLIC_API_URL vacío el fetch va a
+// /api/... del mismo origen y Next lo reenvía al backend local.
+const backendUrl = process.env.BACKEND_URL || "http://localhost:3000";
+
 const nextConfig: NextConfig = {
+  async rewrites() {
+    return [{ source: "/api/:path*", destination: `${backendUrl}/api/:path*` }];
+  },
   async headers() {
     return [
       {
