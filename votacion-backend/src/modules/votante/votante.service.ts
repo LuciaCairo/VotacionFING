@@ -1,4 +1,5 @@
 import { prisma } from '../../config/prisma.js';
+import { env } from '../../config/env.js';
 import { logger } from '../../config/logger.js';
 import {
   type AppError,
@@ -520,6 +521,11 @@ export async function emitirVoto(
   // ── 6. Confirmar la participación ────────────────────────────
   let fechaVoto: Date;
   try {
+    if (env.devForzarErrorConfirmacion) {
+      // Solo desarrollo (DEV_FORZAR_ERROR_CONFIRMACION, ver env.ts): simula
+      // que la BD falla justo después de que el voto entró en BFA.
+      throw new Error('DEV_FORZAR_ERROR_CONFIRMACION: error forzado al confirmar la participación');
+    }
     fechaVoto = await confirmarParticipacion(reserva.id);
   } catch (err) {
     // El voto ya está en BFA. La reserva queda pendiente y se resuelve sola:

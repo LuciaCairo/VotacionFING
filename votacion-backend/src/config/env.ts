@@ -53,6 +53,11 @@ const envSchema = z.object({
 
   // CORS
   CORS_ORIGINS: z.string().default('http://localhost:3000'),
+
+  // Solo desarrollo: fuerza un error al confirmar la participacion en BD
+  // justo despues de que el voto entro en BFA, para probar la reconciliacion
+  // (ver emitirVoto). Se ignora con NODE_ENV=production (ver env abajo).
+  DEV_FORZAR_ERROR_CONFIRMACION: z.enum(['true', 'false']).default('false'),
 }).refine((data) => data.SALDO_UMBRAL_ADVERTENCIA > data.SALDO_UMBRAL_CRITICO, {
   message: 'SALDO_UMBRAL_ADVERTENCIA debe ser mayor que SALDO_UMBRAL_CRITICO',
   path: ['SALDO_UMBRAL_ADVERTENCIA'],
@@ -74,6 +79,8 @@ export const env = {
   isProd: raw.NODE_ENV === 'production',
   isDev: raw.NODE_ENV === 'development',
   corsOrigins: raw.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean),
+  devForzarErrorConfirmacion:
+    raw.NODE_ENV !== 'production' && raw.DEV_FORZAR_ERROR_CONFIRMACION === 'true',
 } as const;
 
 export type Env = typeof env;

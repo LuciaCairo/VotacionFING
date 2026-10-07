@@ -14,6 +14,11 @@ async function main(): Promise<void> {
   try {
     await app.listen({ port: env.PORT, host: env.HOST });
     logger.info(`Backend de votacion escuchando en http://${env.HOST}:${env.PORT}`);
+    if (env.devForzarErrorConfirmacion) {
+      logger.warn(
+        'DEV_FORZAR_ERROR_CONFIRMACION activo: todo voto nuevo falla al confirmarse en BD despues de entrar en BFA (solo para probar la reconciliacion).',
+      );
+    }
   } catch (err) {
     logger.error({ err }, 'No se pudo iniciar el servidor');
     process.exit(1);
