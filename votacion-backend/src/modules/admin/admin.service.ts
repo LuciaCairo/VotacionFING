@@ -240,26 +240,23 @@ const ZONA_HORARIA_LOCAL = 'America/Argentina/Mendoza';
 
 /**
  * Formatea una fecha en hora local de Mendoza (UTC-3, sin horario de verano)
- * como 'YYYY-MM-DD HH:mm:ss'. Todo el resto de la app manda fechas como ISO
+ * como 'YYYY-MM-DD', sin hora. Todo el resto de la app manda fechas como ISO
  * UTC y deja que el frontend las convierta a hora local para mostrarlas (ver
  * `formatFechaHora` en ambos frontends) — acá no hay frontend de por medio
  * (el CSV se abre directo en Excel), así que la conversión hay que hacerla
  * server-side explícitamente contra la zona horaria de la institución, en vez
- * de asumir que el proceso de Node corre en esa misma zona horaria.
+ * de asumir que el proceso de Node corre en esa misma zona horaria (el día
+ * puede cambiar según la zona).
  */
-function formatFechaHoraLocal(fecha: Date): string {
+function formatFechaLocal(fecha: Date): string {
   const partes = new Intl.DateTimeFormat('en-CA', {
     timeZone: ZONA_HORARIA_LOCAL,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
   }).formatToParts(fecha);
   const obtener = (tipo: string) => partes.find((p) => p.type === tipo)?.value ?? '';
-  return `${obtener('year')}-${obtener('month')}-${obtener('day')} ${obtener('hour')}:${obtener('minute')}:${obtener('second')}`;
+  return `${obtener('year')}-${obtener('month')}-${obtener('day')}`;
 }
 
 /**
@@ -268,6 +265,10 @@ function formatFechaHoraLocal(fecha: Date): string {
  * voto (Sí/No) y fecha_voto. Nunca expone a qué lista votó cada persona —
  * Participacion no tiene esa relación (ver modelo en schema.prisma, preserva
  * el anonimato).
+ *
+ * fecha_voto va solo con el día, sin hora: con la hora exacta de cada voto y
+ * la hora de los bloques de BFA (cada transacción votar() lleva la lista en
+ * claro) se podía identificar el voto de cada persona.
  *
  * A diferencia de `listarPadron` (que solo muestra el padrón *actual*), acá
  * se incluye a cualquier votante que además tenga una Participacion en esta
@@ -325,7 +326,7 @@ export async function descargarParticipacionEleccionCsv(id: number): Promise<str
       escaparCampoCSV(v.correo),
       escaparCampoCSV(String(v.activo)),
       escaparCampoCSV(participacion ? 'Sí' : 'No'),
-      escaparCampoCSV(participacion ? formatFechaHoraLocal(participacion.fechaVoto) : ''),
+      escaparCampoCSV(participacion ? formatFechaLocal(participacion.fechaVoto) : ''),
     ].join(',');
   });
 
