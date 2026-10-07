@@ -119,6 +119,11 @@ export interface VerificacionListaDTO {
  */
 export interface VerificacionResultadosDTO extends BlockchainEleccionDTO {
   contrato_con_codigo: boolean;
+  /** Wallet de este sistema: la única que debería poder votar en el contrato. */
+  backend_esperado: string;
+  /** `backend()` del contrato; null si no hay contrato en la dirección. */
+  backend_contrato: string | null;
+  backend_coincide: boolean;
   bloque: number;
   verificado_at: string;
   coincide: boolean;

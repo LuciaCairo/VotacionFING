@@ -5,6 +5,8 @@ import { env } from '../../config/env.js';
 import {
   desplegarContrato,
   contratoTieneCodigo,
+  esWalletDelBackend,
+  obtenerBackendAutorizado,
   obtenerNombreEleccion,
   obtenerFechaApertura,
   obtenerFechaCierre,
@@ -529,6 +531,8 @@ interface EleccionParaIntegridad {
 /** Datos leídos del contrato. `tieneCodigo: false` corta la lectura del resto. */
 interface DatosBfa {
   tieneCodigo: boolean;
+  /** Address autorizada a votar en el contrato (`backend()`). */
+  backend?: string;
   nombre?: string;
   fechaApertura?: number;
   fechaCierre?: number;
@@ -588,6 +592,16 @@ function construirSeccionEleccion(e: EleccionParaIntegridad, bfa: DatosBfa): Int
   const fechaCierreUnix = Math.floor(e.fechaCierre.getTime() / 1000);
 
   checks.push(
+    // Que el contrato sea de este sistema: la única cuenta que puede votar en
+    // él tiene que ser la wallet del backend. Un contrato copia (mismo nombre,
+    // fechas y listas) desplegado por otra wallet pasaría el resto de los
+    // checks. `bd` acá es la wallet configurada en el backend, no un dato de BD.
+    {
+      campo: 'backend autorizado en el contrato (wallet de este sistema)',
+      ok: bfa.tieneCodigo && bfa.backend !== undefined && esWalletDelBackend(bfa.backend),
+      bd: env.BACKEND_ADDRESS,
+      bfa: bfa.tieneCodigo ? (bfa.backend ?? null) : SIN_CODIGO,
+    },
     {
       campo: 'nombre',
       ok: bfa.tieneCodigo && e.nombre === bfa.nombre,
@@ -826,7 +840,8 @@ export async function verificarIntegridadEleccion(
     if (!tieneCodigo) {
       bfa = { tieneCodigo: false };
     } else {
-      const [nombre, fechaApertura, fechaCierre, cantidadListas] = await Promise.all([
+      const [backend, nombre, fechaApertura, fechaCierre, cantidadListas] = await Promise.all([
+        obtenerBackendAutorizado(contratoAddress),
         obtenerNombreEleccion(contratoAddress),
         obtenerFechaApertura(contratoAddress),
         obtenerFechaCierre(contratoAddress),
@@ -859,7 +874,7 @@ export async function verificarIntegridadEleccion(
         ),
       );
 
-      bfa = { tieneCodigo: true, nombre, fechaApertura, fechaCierre, cantidadListas, nombresListas, votos };
+      bfa = { tieneCodigo: true, backend, nombre, fechaApertura, fechaCierre, cantidadListas, nombresListas, votos };
     }
   } catch (err) {
     logger.error({ err, eleccionId }, 'No se pudo conectar a BFA para verificar integridad');

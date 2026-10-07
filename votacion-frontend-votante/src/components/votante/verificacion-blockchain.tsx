@@ -171,6 +171,13 @@ function ResultadoVerificacion({ datos }: { datos: VerificacionResultadosDTO }) 
         {formatFechaHora(datos.verificado_at)}.
       </div>
 
+      {datos.contrato_con_codigo && !datos.backend_coincide && (
+        <p className="mt-1.5 break-all text-[12.5px] font-bold text-[#9c2b2b]">
+          ✗ El contrato no es de este sistema: la cuenta autorizada a votar en
+          él es {datos.backend_contrato ?? "—"}, no {datos.backend_esperado}.
+        </p>
+      )}
+
       {datos.contrato_con_codigo ? (
         <ul className="mt-1.5 flex flex-wrap gap-x-5 gap-y-0.5 text-[12.5px]">
           {datos.listas.map((l) => (

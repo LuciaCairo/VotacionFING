@@ -215,6 +215,24 @@ export async function contratoTieneCodigo(address: string): Promise<boolean> {
   return codigo !== '0x';
 }
 
+/**
+ * Lee la address autorizada a votar (`backend`) grabada en el contrato al
+ * desplegarlo. Si no es la wallet de este backend, el contrato no es de este
+ * sistema (ver esWalletDelBackend).
+ */
+export async function obtenerBackendAutorizado(contratoAddress: string): Promise<string> {
+  const contrato = contratoLectura(contratoAddress);
+  return contrato.backend();
+}
+
+/**
+ * Indica si una address es la wallet de este backend. Se compara sin
+ * distinguir mayusculas: el checksum de EIP-55 no cambia la address.
+ */
+export function esWalletDelBackend(address: string): boolean {
+  return address.toLowerCase() === env.BACKEND_ADDRESS.toLowerCase();
+}
+
 /** Lee el nombre de la eleccion grabado (inmutable) en el contrato. */
 export async function obtenerNombreEleccion(contratoAddress: string): Promise<string> {
   const contrato = contratoLectura(contratoAddress);

@@ -9,7 +9,9 @@ import {
 } from '../../utils/errors.js';
 import {
   contratoTieneCodigo,
+  esWalletDelBackend,
   nombreRedBfa,
+  obtenerBackendAutorizado,
   obtenerCantidadListas,
   obtenerListaPorIndice,
   obtenerNumeroDeBloque,
@@ -161,8 +163,10 @@ export async function obtenerResultados(eleccionId: number) {
 /**
  * Compara en vivo los resultados publicados (snapshot en BD) contra lo que
  * registra el contrato de la elección en BFA: nombre y votos de cada lista,
- * índice por índice. Pensado para que cualquier usuario autenticado, no solo
- * el admin, pueda auditar los resultados.
+ * índice por índice, y que el contrato sea de este sistema (su `backend()`,
+ * la única cuenta que puede votar, es la wallet del backend). Pensado para
+ * que cualquier usuario autenticado, no solo el admin, pueda auditar los
+ * resultados.
  *
  * Es una comodidad, no una prueba independiente: la lectura la hace este
  * backend. Para no depender de él, `blockchain` trae lo necesario para
@@ -199,13 +203,15 @@ export async function verificarResultadosEnBfa(eleccionId: number) {
   let tieneCodigo: boolean;
   let votosContrato: number[] = [];
   let nombresContrato: string[] = [];
+  let backendContrato: string | null = null;
   try {
     [bloque, tieneCodigo] = await Promise.all([obtenerNumeroDeBloque(), contratoTieneCodigo(address)]);
     if (tieneCodigo) {
       const cantidad = await obtenerCantidadListas(address);
-      [votosContrato, nombresContrato] = await Promise.all([
+      [votosContrato, nombresContrato, backendContrato] = await Promise.all([
         obtenerVotos(address),
         Promise.all(Array.from({ length: cantidad }, (_, i) => obtenerListaPorIndice(address, i))),
+        obtenerBackendAutorizado(address),
       ]);
     }
   } catch (err) {
@@ -238,12 +244,17 @@ export async function verificarResultadosEnBfa(eleccionId: number) {
     };
   });
 
+  const backendCoincide = backendContrato !== null && esWalletDelBackend(backendContrato);
+
   return {
     ...datosBlockchain(address),
     contrato_con_codigo: tieneCodigo,
+    backend_esperado: env.BACKEND_ADDRESS,
+    backend_contrato: backendContrato,
+    backend_coincide: backendCoincide,
     bloque,
     verificado_at: new Date().toISOString(),
-    coincide: tieneCodigo && listas.every((l) => l.coincide),
+    coincide: tieneCodigo && backendCoincide && listas.every((l) => l.coincide),
     listas,
   };
 }

@@ -116,6 +116,8 @@ export function bannerVerificadaParcial(pendientes: string[]): {
 const CAMPO_LABELS: Record<string, string> = {
   "Contrato desplegado (código presente en la address)":
     "Contrato Desplegado (código presente en la address)",
+  "backend autorizado en el contrato (wallet de este sistema)":
+    "Backend Autorizado (wallet de este sistema)",
   nombre: "Nombre",
   "fecha_inicio (unix)": "Fecha Inicio (unix)",
   "fecha_cierre (unix)": "Fecha Cierre (unix)",
