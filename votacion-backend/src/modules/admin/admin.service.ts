@@ -701,11 +701,13 @@ function construirSeccionResultados(e: EleccionParaIntegridad, bfa: DatosBfa): I
  * con ese hash se encuentra la transacción, que lleva la lista en claro.
  */
 function construirSeccionParticipacion(e: EleccionParaIntegridad, bfa: DatosBfa): IntegridadSeccion {
-  // Igual que resultados: solo aplica a elecciones finalizadas. Mientras la
+  // Misma precondicion que resultados: finalizada Y con snapshot. Mientras la
   // eleccion sigue abierta, obtenerTodosLosVotos() todavia no es comparable
   // (revierte hasta el cierre) y el conteo de participaciones en BD sigue
-  // cambiando voto a voto, asi que no hay nada estable para auditar todavia.
-  if (e.estado !== 'finalizada') {
+  // cambiando voto a voto. Y entre el cierre y el snapshot puede haber
+  // reservas sin confirmar cuyo voto si entro: el job las resuelve recien al
+  // tomar el snapshot, asi que antes el conteo daria discrepancias falsas.
+  if (e.estado !== 'finalizada' || !e.snapshotAt) {
     return { estado: 'no_aplica', checks: [] };
   }
 
@@ -756,7 +758,7 @@ function construirSeccionParticipacion(e: EleccionParaIntegridad, bfa: DatosBfa)
 /**
  * Verifica la integridad de TODOS los datos de una elección comparando la
  * BD contra el contrato en BFA (HU-24). Cuatro secciones: eleccion, listas,
- * resultados (no_aplica si todavía no hay snapshot) y participacion.
+ * resultados y participacion (estas dos, no_aplica si todavía no hay snapshot).
  *
  * Si el nodo de BFA no responde, se corta con 503: nunca se devuelve
  * "verificada" cuando no se pudo comparar contra la blockchain. Que el
