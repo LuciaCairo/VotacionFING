@@ -78,6 +78,36 @@ export const GLOBAL_BANNER_META: Record<
   },
 };
 
+/**
+ * Títulos de las secciones que todavía no aplican (resultados y participación
+ * de una elección que no finalizó). Si hay alguna, un "verificada" global solo
+ * cubre lo que se pudo comparar, y el banner tiene que decirlo.
+ */
+export function seccionesNoAplica(secciones: IntegridadSeccionesDTO): string[] {
+  return SECCION_ORDEN.filter((key) => secciones[key].estado === "no_aplica").map(
+    (key) => SECCION_TITULOS[key],
+  );
+}
+
+/** Título y texto del banner "verificada" cuando quedaron secciones sin comparar. */
+export function bannerVerificadaParcial(pendientes: string[]): {
+  titulo: string;
+  texto: string;
+} {
+  const nombres =
+    pendientes.length === 1
+      ? pendientes[0]
+      : `${pendientes.slice(0, -1).join(", ")} y ${pendientes[pendientes.length - 1]}`;
+  const pendiente =
+    pendientes.length === 1
+      ? `La sección ${nombres} todavía no aplica: se compara`
+      : `Las secciones ${nombres} todavía no aplican: se comparan`;
+  return {
+    titulo: "Verificada hasta el momento",
+    texto: `Todo lo que se puede comparar en este momento coincide entre la base de datos y la blockchain. ${pendiente} una vez finalizada la elección y tomados sus resultados.`,
+  };
+}
+
 const CAMPO_LABELS: Record<string, string> = {
   "Contrato desplegado (código presente en la address)":
     "Contrato Desplegado (código presente en la address)",

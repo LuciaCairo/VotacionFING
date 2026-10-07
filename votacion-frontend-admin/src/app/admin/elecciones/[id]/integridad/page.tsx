@@ -27,8 +27,10 @@ import {
   GLOBAL_BANNER_META,
   SECCION_ORDEN,
   SECCION_TITULOS,
+  bannerVerificadaParcial,
   formatCampoIntegridad,
   formatValorIntegridad,
+  seccionesNoAplica,
 } from "@/lib/integridad";
 
 export default function IntegridadEleccionPage() {
@@ -120,7 +122,10 @@ function IntegridadContenido({ data }: { data: IntegridadEleccionDTO }) {
         {data.eleccion_id}
       </div>
 
-      <IntegridadBanner estado={data.integridad_global} />
+      <IntegridadBanner
+        estado={data.integridad_global}
+        noAplica={seccionesNoAplica(data.secciones)}
+      />
 
       <div className="flex flex-col gap-4">
         {SECCION_ORDEN.map((key) => {
@@ -143,10 +148,18 @@ function IntegridadContenido({ data }: { data: IntegridadEleccionDTO }) {
 
 function IntegridadBanner({
   estado,
+  noAplica,
 }: {
   estado: IntegridadEleccionDTO["integridad_global"];
+  /** Títulos de las secciones en "no_aplica" (ver seccionesNoAplica). */
+  noAplica: string[];
 }) {
-  const meta = GLOBAL_BANNER_META[estado];
+  // Con secciones sin comparar (ej. elección activa), "verificada" no puede
+  // decir que coinciden *todos* los datos: solo lo comparado hasta ahora.
+  const meta =
+    estado === "verificada" && noAplica.length > 0
+      ? { ...GLOBAL_BANNER_META.verificada, ...bannerVerificadaParcial(noAplica) }
+      : GLOBAL_BANNER_META[estado];
   const Icono =
     estado === "verificada"
       ? CircleCheck

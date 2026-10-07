@@ -162,6 +162,12 @@ model Votante {
 // tampoco guarda nada que identifique la transaccion del voto en BFA: la
 // transaccion lleva la lista en claro, asi que cualquier vinculo
 // participacion -> transaccion revelaria el voto.
+//
+// Trigger trg_participacion_proteger_confirmada (migracion
+// 20261007162536_participacion_confirmada_protegida, no lo modela Prisma):
+// una participacion confirmada (hashPendiente = null) no se puede borrar ni
+// modificar. Con hashes aleatorios el contrato no frena a la misma persona
+// votando dos veces; lo frena esta fila, asi que no puede desaparecer.
 
 model Participacion {
   id            Int      @id @default(autoincrement())

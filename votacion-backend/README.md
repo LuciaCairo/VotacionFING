@@ -144,6 +144,13 @@ prisma/
     si entró, el reintento reutiliza ese hash y el contrato rechaza el repetido, así
     que nunca se cuentan dos votos. Las reservas que nadie reintentó se resuelven
     contra el contrato al cerrar la elección (job de snapshot).
+  - Con hashes aleatorios el contrato ya no puede saber que dos votos son de la
+    misma persona: el doble voto lo frena solo la fila de `PARTICIPACION`. Por eso
+    un trigger de la BD (`trg_participacion_proteger_confirmada`) impide borrar o
+    modificar una participación confirmada; las reservas pendientes sí se pueden
+    borrar o confirmar. Protege contra errores y bugs, no contra alguien con
+    permisos para quitar el trigger. `TRUNCATE` (lo que usa `prisma/limpiar.ts`)
+    no lo dispara.
   - El votante recibe una **constancia de participación** (elección y fecha), no el
     tx hash: con él podría demostrarle a otro a quién votó.
   - La auditoría de integridad compara la **cantidad** de participaciones contra el
@@ -165,8 +172,9 @@ prisma/
   de cada lista, leídos en vivo del contrato). Como esa verificación igual la
   hace este backend, los resultados también exponen la red y la dirección del
   contrato, para que cualquiera llame a `obtenerTodosLosVotos()` directamente
-  en BFA sin depender del sistema. Para elecciones **activas**, el panel de control lee
-  siempre en vivo del contrato (no hay snapshot todavía).
+  en BFA sin depender del sistema. Mientras la elección está **activa**, la app no
+  muestra votos en ningún lado (ni el panel ni la verificación de integridad):
+  `obtenerTodosLosVotos()` revierte hasta el cierre (`eleccionFinalizada`).
   - Regla de empate: el voto en blanco es una lista más y participa del máximo
     (no se excluye especialmente). Se toma el valor máximo de votos entre
     todas las listas; si una sola lista lo alcanza hay `ganador_unico`, si dos

@@ -493,6 +493,13 @@ export async function emitirVoto(
       // nadie reintenta, se resuelve al cerrar la elección (ver
       // resolverParticipacionesPendientes en eleccion.job.ts).
       logger.error({ err, eleccionId, motivo }, 'BFA: no se pudo confirmar el voto; la reserva queda pendiente');
+      void registrarLog({
+        tipoEvento: 'voto_error',
+        rolUsuario: 'votante',
+        idUsuario: votanteId,
+        descripcion: `Voto sin confirmar en elección ${eleccionId}: no se pudo verificar si entró a BFA. La participación queda pendiente hasta un reintento o el cierre.`,
+        ip,
+      });
       throw new InternoError(
         'No se pudo registrar el voto en la blockchain. Podés intentar nuevamente.',
       );
@@ -518,6 +525,15 @@ export async function emitirVoto(
     // El voto ya está en BFA. La reserva queda pendiente y se resuelve sola:
     // en un reintento (el contrato responde "ya voto") o al cerrar la elección.
     logger.error({ err, eleccionId }, 'Fallo al confirmar la participación en BD post-BFA');
+    // Best-effort: si la BD es lo que está fallando, probablemente esto
+    // tampoco se guarde (queda el logger.error de arriba).
+    void registrarLog({
+      tipoEvento: 'voto_error',
+      rolUsuario: 'votante',
+      idUsuario: votanteId,
+      descripcion: `Voto registrado en BFA en elección ${eleccionId}, pero falló la confirmación en BD. La participación queda pendiente hasta un reintento o el cierre.`,
+      ip,
+    });
     throw new InternoError(
       'Tu voto quedó registrado en la blockchain, pero hubo un error al guardar tu constancia. Intentá nuevamente en unos minutos: el sistema va a reconocer tu voto sin contarlo dos veces.',
     );

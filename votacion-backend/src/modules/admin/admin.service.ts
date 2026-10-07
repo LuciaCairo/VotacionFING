@@ -834,11 +834,20 @@ export async function verificarIntegridadEleccion(
       // obtenerTodosLosVotos() exige que el contrato ya haya cerrado
       // (eleccionFinalizada) y revierte si se llama antes. Se aísla en su
       // propio try/catch para que una elección todavía abierta no tumbe el
-      // resto de la verificación de integridad.
+      // resto de la verificación de integridad. Solo se absorbe ESE revert,
+      // reconocido por el mensaje del modifier: cualquier otro error (red,
+      // timeout, o un error del nodo que ethers también informa como
+      // CALL_EXCEPTION, "missing revert data") sube al catch de afuera y corta
+      // con 503, en vez de mostrarse como votos "no legibles" o como una
+      // discrepancia que no existe.
       let votos: number[] | undefined;
       try {
         votos = await obtenerVotos(contratoAddress);
-      } catch {
+      } catch (err) {
+        const { code, reason } = err as { code?: string; reason?: string | null };
+        const eleccionSinCerrar =
+          code === 'CALL_EXCEPTION' && (reason ?? '').includes('al finalizar la eleccion');
+        if (!eleccionSinCerrar) throw err;
         votos = undefined;
       }
 
