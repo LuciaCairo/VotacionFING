@@ -73,8 +73,10 @@ export const GLOBAL_BANNER_META: Record<
     titleColor: "#8a5a10",
     textColor: "#9c6a1f",
     titulo: "Verificada con advertencias",
+    // Lo generan solo los checks internos (ver estadoDeChecks en el backend):
+    // reservas de voto sin confirmar o un estado que no cuadra con las fechas.
     texto:
-      "No se encontraron discrepancias, pero algunos datos no se pudieron comparar directamente contra la blockchain.",
+      "No se encontraron discrepancias con la blockchain, pero hay advertencias internas: reservas de voto sin confirmar o un estado de la elección que no coincide con sus fechas. Revisá el detalle por sección.",
   },
 };
 

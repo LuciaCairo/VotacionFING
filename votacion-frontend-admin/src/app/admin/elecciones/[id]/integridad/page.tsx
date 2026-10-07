@@ -197,12 +197,16 @@ function IntegridadBanner({
           {meta.texto}
         </div>
       </div>
-      <div
-        className="shrink-0 whitespace-nowrap rounded-[6px] px-2.5 py-1 font-mono text-[11px]"
-        style={{ backgroundColor: "rgba(255,255,255,0.5)", color: meta.textColor }}
-      >
-        Blockchain verificada
-      </div>
+      {/* Solo con "verificada": con discrepancias o advertencias el chip
+          afirmaría justo lo contrario de lo que dice el banner. */}
+      {estado === "verificada" && (
+        <div
+          className="shrink-0 whitespace-nowrap rounded-[6px] px-2.5 py-1 font-mono text-[11px]"
+          style={{ backgroundColor: "rgba(255,255,255,0.5)", color: meta.textColor }}
+        >
+          Blockchain verificada
+        </div>
+      )}
     </div>
   );
 }
