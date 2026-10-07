@@ -72,6 +72,16 @@ export interface ResultadoDTO {
   listas_empatadas?: { nombre: string; votos: number }[];
 }
 
+/**
+ * Dónde vive la elección en BFA: red y dirección del contrato. Alcanza para
+ * que cualquiera verifique los resultados sin depender de este sistema.
+ */
+export interface BlockchainEleccionDTO {
+  red: string;
+  chain_id: number;
+  contrato_address: string | null;
+}
+
 export interface ResultadosEleccionDTO {
   id: number;
   nombre: string;
@@ -82,12 +92,45 @@ export interface ResultadosEleccionDTO {
   participacion: ParticipacionDTO;
   resultado: ResultadoDTO;
   snapshot_at: string;
+  blockchain: BlockchainEleccionDTO;
 }
 
 export function obtenerResultadosRequest(
   id: number,
 ): Promise<ResultadosEleccionDTO> {
   return getJson<ResultadosEleccionDTO>(`/api/elecciones/${id}/resultados`);
+}
+
+export interface VerificacionListaDTO {
+  indice: number;
+  /** null si el contrato tiene un índice que la BD no tiene. */
+  nombre: string | null;
+  nombre_contrato: string | null;
+  votos_publicados: number | null;
+  votos_contrato: number | null;
+  coincide: boolean;
+}
+
+/**
+ * Contrato de GET /api/elecciones/:id/verificacion (ver
+ * votacion-backend/src/modules/eleccion/eleccion.service.ts,
+ * verificarResultadosEnBfa): resultados publicados vs. contrato en BFA,
+ * leídos en vivo en el bloque `bloque`.
+ */
+export interface VerificacionResultadosDTO extends BlockchainEleccionDTO {
+  contrato_con_codigo: boolean;
+  bloque: number;
+  verificado_at: string;
+  coincide: boolean;
+  listas: VerificacionListaDTO[];
+}
+
+export function verificarResultadosRequest(
+  id: number,
+): Promise<VerificacionResultadosDTO> {
+  return getJson<VerificacionResultadosDTO>(
+    `/api/elecciones/${id}/verificacion`,
+  );
 }
 
 /**

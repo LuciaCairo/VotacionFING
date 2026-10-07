@@ -28,8 +28,10 @@ El backend está **completo y probado**:
   blockchain (`GET /api/admin/blockchain/saldo`).
 - ✅ **Módulo votante completo**: elecciones vigentes/finalizadas, detalle, emisión de
   voto y constancia de participación (`/api/votante/elecciones/...`).
-- ✅ Endpoint compartido admin/votante de resultados de una elección finalizada
-  (`GET /api/elecciones/:id/resultados`).
+- ✅ Endpoints compartidos admin/votante de una elección finalizada: resultados
+  (`GET /api/elecciones/:id/resultados`, incluye red y dirección del contrato) y
+  verificación en vivo de esos resultados contra el contrato en BFA
+  (`GET /api/elecciones/:id/verificacion`).
 - ✅ Cron jobs de transición de estados de elecciones.
 - ✅ Seed de datos de prueba.
 
@@ -158,7 +160,12 @@ prisma/
   performance y disponibilidad para consultar resultados de elecciones cerradas
   sin depender de que el nodo de BFA esté disponible en cada lectura. La
   **integridad** del snapshot sigue siendo verificable comparándolo contra BFA
-  en cualquier momento. Para elecciones **activas**, el panel de control lee
+  en cualquier momento: el admin con el control de integridad completo, y
+  cualquier usuario con `GET /api/elecciones/:id/verificacion` (votos y nombres
+  de cada lista, leídos en vivo del contrato). Como esa verificación igual la
+  hace este backend, los resultados también exponen la red y la dirección del
+  contrato, para que cualquiera llame a `obtenerTodosLosVotos()` directamente
+  en BFA sin depender del sistema. Para elecciones **activas**, el panel de control lee
   siempre en vivo del contrato (no hay snapshot todavía).
   - Regla de empate: el voto en blanco es una lista más y participa del máximo
     (no se excluye especialmente). Se toma el valor máximo de votos entre

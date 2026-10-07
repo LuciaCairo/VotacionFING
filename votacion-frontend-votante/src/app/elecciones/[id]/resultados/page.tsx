@@ -12,6 +12,7 @@ import { ApiError } from "@/lib/api/errors";
 import { clearVotanteSession } from "@/lib/auth/session";
 import { colorResultadoLista } from "@/lib/colors";
 import { formatFechaHora } from "@/lib/format";
+import { VerificacionBlockchain } from "@/components/votante/verificacion-blockchain";
 
 const RUTA_VOTANTE_FINALIZADAS = "/votante?seccion=finalizadas";
 
@@ -22,6 +23,10 @@ const RUTA_VOTANTE_FINALIZADAS = "/votante?seccion=finalizadas";
  * layout, colores, tratamiento del voto en blanco como una lista más y
  * manejo de empate/ganador único. Consume el mismo endpoint compartido
  * GET /api/elecciones/:id/resultados.
+ *
+ * En lugar de la integridad completa del admin, al pie tiene la verificación
+ * de los resultados contra BFA (VerificacionBlockchain): dirección del
+ * contrato, comparación en vivo y cómo hacerla sin depender del sistema.
  */
 export default function ResultadosEleccionPage() {
   const router = useRouter();
@@ -59,7 +64,7 @@ export default function ResultadosEleccionPage() {
           </h1>
         </div>
 
-        <div className="min-h-0 flex-1 lg:flex lg:flex-col">
+        <div className="min-h-0 flex-1 lg:flex lg:flex-col lg:overflow-y-auto">
           {!idValido ? (
             <ErrorState mensaje="El id de la elección no es válido." />
           ) : query.isPending || sesionExpirada ? (
@@ -89,8 +94,11 @@ function ResultadosContenido({
     (a, b) => b.votos - a.votos,
   );
 
+  // min-h-full + flex-auto en la lista (no h-full + flex-1): si la
+  // verificación de abajo se despliega y no entra todo, scrollea el
+  // contenedor entero en vez de aplastar la lista de resultados.
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex min-h-full flex-col">
       <div className="mb-2.5 shrink-0 text-[13px] text-[#5b6b7c] sm:ml-[52px]">
         {resultados.nombre} · Cierre el{" "}
         {formatFechaHora(resultados.fecha_cierre)}
@@ -110,11 +118,11 @@ function ResultadosContenido({
         <ParticipacionCard participacion={participacion} />
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col rounded-[14px] bg-white px-4 pt-4 shadow-[0_4px_14px_rgba(10,37,64,0.06)]">
+      <div className="flex flex-auto flex-col rounded-[14px] bg-white px-4 pt-4 shadow-[0_4px_14px_rgba(10,37,64,0.06)]">
         <div className="mb-2.5 shrink-0 text-[12.5px] font-bold tracking-[0.4px] text-[#5b6b7c]">
           RESULTADOS POR LISTA
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto pb-1 pr-3">
+        <div className="flex-auto pb-1 pr-3">
           {listasOrdenadas.map((lista) => (
             <FilaLista
               key={lista.nombre}
@@ -124,6 +132,12 @@ function ResultadosContenido({
           ))}
         </div>
       </div>
+
+      <VerificacionBlockchain
+        eleccionId={resultados.id}
+        blockchain={resultados.blockchain}
+        listas={resultados.listas}
+      />
     </div>
   );
 }

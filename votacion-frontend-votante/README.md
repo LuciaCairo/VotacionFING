@@ -24,7 +24,10 @@ App del votante **completa**, sin pantallas pendientes:
   finalizó (defensa por si se llega por URL directa).
 - ✅ Resultados de elección finalizada (`/elecciones/[id]/resultados`) — mismo
   endpoint compartido con el panel admin, sin el botón "Ver Integridad" (acción
-  exclusiva de admin).
+  exclusiva de admin). En su lugar, una tarjeta de **verificación en
+  blockchain**: dirección del contrato, botón "Verificar contra BFA" (compara en
+  vivo los votos publicados con los del contrato) y los pasos para verificarlo
+  sin depender del sistema.
 - ✅ Soporte (`/soporte`) — datos de contacto ante problemas para votar.
 
 ---

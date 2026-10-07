@@ -251,5 +251,22 @@ export async function obtenerListaPorIndice(
   return contrato.obtenerLista(indice);
 }
 
+/** Numero del ultimo bloque de BFA: deja constancia de en que estado de la cadena se leyo algo. */
+export async function obtenerNumeroDeBloque(): Promise<number> {
+  return provider.getBlockNumber();
+}
+
+/** Nombre legible de la red a la que esta conectado el backend, segun su chainId. */
+export function nombreRedBfa(): string {
+  switch (env.BFA_CHAIN_ID) {
+    case 99118822:
+      return 'Blockchain Federal Argentina — red de prueba (testnet)';
+    case 200941592:
+      return 'Blockchain Federal Argentina — red principal';
+    default:
+      return `Red con chainId ${env.BFA_CHAIN_ID}`;
+  }
+}
+
 /** Expone utilidades de bajo nivel por si se necesitan en tests. */
 export const _internals = { provider, signer };

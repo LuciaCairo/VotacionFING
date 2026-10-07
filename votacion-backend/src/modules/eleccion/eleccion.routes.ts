@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { obtenerResultados } from './eleccion.service.js';
+import { obtenerResultados, verificarResultadosEnBfa } from './eleccion.service.js';
 import { eleccionIdParamSchema } from './eleccion.schemas.js';
 
 /**
@@ -12,6 +12,13 @@ export const eleccionRoutes: FastifyPluginAsync = async (app) => {
   app.get('/:id/resultados', { preHandler: app.autenticar }, async (req, reply) => {
     const { id } = eleccionIdParamSchema.parse(req.params);
     const resultado = await obtenerResultados(id);
+    return reply.code(200).send(resultado);
+  });
+
+  // ─── GET /api/elecciones/:id/verificacion ───────────────────
+  app.get('/:id/verificacion', { preHandler: app.autenticar }, async (req, reply) => {
+    const { id } = eleccionIdParamSchema.parse(req.params);
+    const resultado = await verificarResultadosEnBfa(id);
     return reply.code(200).send(resultado);
   });
 };
