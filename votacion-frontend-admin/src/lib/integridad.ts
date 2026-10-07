@@ -53,8 +53,11 @@ export const GLOBAL_BANNER_META: Record<
     titleColor: "#146b3b",
     textColor: "#1e9e5c",
     titulo: "Elección verificada",
+    // La participación no se puede verificar votante por votante: la BD, a
+    // propósito, no guarda qué transacción es de quién (ver
+    // construirSeccionParticipacion en el backend).
     texto:
-      "Todos los datos de la elección coinciden entre la base de datos y la blockchain.",
+      "La elección, sus listas y sus resultados coinciden entre la base de datos y la blockchain. La participación se verifica por cantidad total (participaciones confirmadas vs. votos en el contrato), no votante por votante.",
   },
   discrepancias: {
     bg: "#fdecec",
