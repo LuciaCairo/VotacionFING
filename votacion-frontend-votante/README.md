@@ -20,7 +20,7 @@ App del votante **completa**, sin pantallas pendientes:
 - ✅ Login (`/login`), con guard de sesión para todo `/votante/*` y `/elecciones/*`.
 - ✅ Home (`/votante`): elecciones vigentes y finalizadas, con estado "ya votaste".
 - ✅ Detalle de elección + boleta y emisión de voto (`/elecciones/[id]`) — muestra
-  el comprobante (hash) si ya votaste, y bloquea la boleta si la elección ya
+  la constancia de participación si ya votaste, y bloquea la boleta si la elección ya
   finalizó (defensa por si se llega por URL directa).
 - ✅ Resultados de elección finalizada (`/elecciones/[id]/resultados`) — mismo
   endpoint compartido con el panel admin, sin el botón "Ver Integridad" (acción
@@ -71,13 +71,13 @@ src/
     login/page.tsx                          login (split-screen)
     votante/layout.tsx                       envuelve /votante y /elecciones/* en <VotanteGuard>
     votante/page.tsx                         Home: vigentes / finalizadas
-    elecciones/[id]/page.tsx                  detalle + boleta + voto / comprobante
+    elecciones/[id]/page.tsx                  detalle + boleta + voto / constancia
     elecciones/[id]/resultados/page.tsx      resultados de elección finalizada
     soporte/page.tsx                          contacto de soporte
   components/
     ui/               shadcn (button, alert-dialog, ...)
     auth/              login-form, login-banner
-    votante/           shell compartido (sidebar + topbar), boleta, comprobante,
+    votante/           shell compartido (sidebar + topbar), boleta, constancia,
                         diálogo de confirmación de voto, cards de elección
   lib/
     validations/       schemas Zod espejados del backend (auth)
@@ -104,8 +104,11 @@ redirige a `/login`.
 
 - El voto es irreversible: la boleta pide confirmación explícita
   (`ConfirmarVotoDialog`) antes de emitir, y una vez votado el detalle de la
-  elección solo muestra el comprobante (hash de la transacción) — nunca la
-  lista elegida, ni siquiera al propio votante, para preservar el anonimato.
+  elección solo muestra una constancia de participación (elección y fecha) —
+  nunca la lista elegida, ni siquiera al propio votante, para preservar el
+  anonimato. Tampoco muestra el hash de la transacción en BFA: la transacción
+  lleva la lista en claro, así que con ese hash el votante podría demostrarle
+  a otro a quién votó.
 - El voto en blanco se muestra como una opción más de la boleta (no aparte).
 - La emisión de voto (`POST /elecciones/:id/votar`) espera confirmación real
   de la transacción en BFA, así que usa un timeout más largo (60s) que el

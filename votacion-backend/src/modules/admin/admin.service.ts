@@ -11,7 +11,6 @@ import {
   obtenerCantidadListas,
   obtenerListaPorIndice,
   obtenerVotos,
-  yaVotoEnContrato,
   obtenerSaldoBackend,
 } from '../../services/blockchain.service.js';
 import { registrarLog } from '../../services/log.service.js';
@@ -292,8 +291,13 @@ export async function descargarParticipacionEleccionCsv(id: number): Promise<str
     );
   }
 
+  // Solo participaciones confirmadas: una reserva que nunca se confirmó no es
+  // un voto (al cerrar la elección se resuelven todas — ver
+  // resolverParticipacionesPendientes en eleccion.job.ts —, esto es defensivo).
+  const participacionConfirmada = { idEleccion: id, hashPendiente: null };
+
   const votantes = await prisma.votante.findMany({
-    where: { OR: [{ activo: true }, { participaciones: { some: { idEleccion: id } } }] },
+    where: { OR: [{ activo: true }, { participaciones: { some: participacionConfirmada } }] },
     orderBy: { nombreCompleto: 'asc' },
     select: {
       legajo: true,
@@ -302,7 +306,7 @@ export async function descargarParticipacionEleccionCsv(id: number): Promise<str
       correo: true,
       activo: true,
       participaciones: {
-        where: { idEleccion: id },
+        where: participacionConfirmada,
         select: { fechaVoto: true },
       },
     },
@@ -518,7 +522,8 @@ interface EleccionParaIntegridad {
   totalVotos: number | null;
   snapshotAt: Date | null;
   listas: { nombre: string; indice: number; resultados: { votos: number }[] }[];
-  participaciones: { id: number; hashBlockchain: string }[];
+  participacionesConfirmadas: number;
+  participacionesPendientes: number;
 }
 
 /** Datos leídos del contrato. `tieneCodigo: false` corta la lectura del resto. */
@@ -530,7 +535,6 @@ interface DatosBfa {
   cantidadListas?: number;
   nombresListas?: string[];
   votos?: number[];
-  hashesVotaron?: Map<string, boolean>;
 }
 
 interface IntegridadCheck {
@@ -690,6 +694,12 @@ function construirSeccionResultados(e: EleccionParaIntegridad, bfa: DatosBfa): I
   return { estado: estadoDeChecks(checks), checks };
 }
 
+/**
+ * La participación se audita por cantidad: participaciones confirmadas en BD
+ * vs. total de votos en el contrato. Ya no hay un check por votante contra
+ * yaVotoEstaPersona porque la BD, a propósito, no guarda el hash de cada voto:
+ * con ese hash se encuentra la transacción, que lleva la lista en claro.
+ */
 function construirSeccionParticipacion(e: EleccionParaIntegridad, bfa: DatosBfa): IntegridadSeccion {
   // Igual que resultados: solo aplica a elecciones finalizadas. Mientras la
   // eleccion sigue abierta, obtenerTodosLosVotos() todavia no es comparable
@@ -703,7 +713,7 @@ function construirSeccionParticipacion(e: EleccionParaIntegridad, bfa: DatosBfa)
     return {
       estado: 'discrepancias',
       checks: [
-        { campo: 'cantidad_participaciones vs. total de votos en el contrato', ok: false, bd: e.participaciones.length, bfa: SIN_CODIGO },
+        { campo: 'cantidad_participaciones vs. total de votos en el contrato', ok: false, bd: e.participacionesConfirmadas, bfa: SIN_CODIGO },
       ],
     };
   }
@@ -714,8 +724,8 @@ function construirSeccionParticipacion(e: EleccionParaIntegridad, bfa: DatosBfa)
     const totalVotosBfa = bfa.votos.reduce((acc, v) => acc + v, 0);
     checks.push({
       campo: 'cantidad_participaciones vs. total de votos en el contrato',
-      ok: e.participaciones.length === totalVotosBfa,
-      bd: e.participaciones.length,
+      ok: e.participacionesConfirmadas === totalVotosBfa,
+      bd: e.participacionesConfirmadas,
       bfa: totalVotosBfa,
     });
   } else {
@@ -724,21 +734,21 @@ function construirSeccionParticipacion(e: EleccionParaIntegridad, bfa: DatosBfa)
     checks.push({
       campo: 'cantidad_participaciones vs. total de votos en el contrato',
       ok: true,
-      bd: e.participaciones.length,
+      bd: e.participacionesConfirmadas,
       bfa: 'no legible todavía: el contrato exige que la elección haya cerrado',
       interno: true,
     });
   }
 
-  for (const p of e.participaciones) {
-    const votoEnContrato = bfa.hashesVotaron?.get(p.hashBlockchain) ?? false;
-    checks.push({
-      campo: `yaVotoEstaPersona — participación #${p.id}`,
-      ok: votoEnContrato,
-      bd: p.hashBlockchain,
-      bfa: votoEnContrato,
-    });
-  }
+  // Reservas de voto sin confirmar: el job las resuelve contra el contrato al
+  // tomar el snapshot (ver resolverParticipacionesPendientes en
+  // eleccion.job.ts). Si quedan, el conteo de arriba todavía puede cambiar.
+  checks.push({
+    campo: 'participaciones sin confirmar',
+    ok: e.participacionesPendientes === 0,
+    bd: e.participacionesPendientes,
+    interno: true,
+  });
 
   return { estado: estadoDeChecks(checks), checks };
 }
@@ -773,13 +783,22 @@ export async function verificarIntegridadEleccion(
         orderBy: { indice: 'asc' },
         select: { nombre: true, indice: true, resultados: { select: { votos: true } } },
       },
-      participaciones: { select: { id: true, hashBlockchain: true } },
     },
   });
 
   if (!eleccion) {
     throw new NoEncontradoError(`No existe una elección con id ${eleccionId}.`);
   }
+
+  const [participacionesConfirmadas, participacionesPendientes] = await Promise.all([
+    prisma.participacion.count({ where: { idEleccion: eleccionId, hashPendiente: null } }),
+    prisma.participacion.count({ where: { idEleccion: eleccionId, hashPendiente: { not: null } } }),
+  ]);
+  const datosBd: EleccionParaIntegridad = {
+    ...eleccion,
+    participacionesConfirmadas,
+    participacionesPendientes,
+  };
 
   if (!eleccion.contratoAddress) {
     throw new ConflictoError(
@@ -829,13 +848,7 @@ export async function verificarIntegridadEleccion(
         ),
       );
 
-      const hashesUnicos = [...new Set(eleccion.participaciones.map((p) => p.hashBlockchain))];
-      const resultadosHash = await Promise.all(
-        hashesUnicos.map((hash) => yaVotoEnContrato(contratoAddress, hash)),
-      );
-      const hashesVotaron = new Map(hashesUnicos.map((hash, i) => [hash, resultadosHash[i]]));
-
-      bfa = { tieneCodigo: true, nombre, fechaApertura, fechaCierre, cantidadListas, nombresListas, votos, hashesVotaron };
+      bfa = { tieneCodigo: true, nombre, fechaApertura, fechaCierre, cantidadListas, nombresListas, votos };
     }
   } catch (err) {
     logger.error({ err, eleccionId }, 'No se pudo conectar a BFA para verificar integridad');
@@ -845,10 +858,10 @@ export async function verificarIntegridadEleccion(
   }
 
   const secciones = {
-    eleccion: construirSeccionEleccion(eleccion, bfa),
-    listas: construirSeccionListas(eleccion, bfa),
-    resultados: construirSeccionResultados(eleccion, bfa),
-    participacion: construirSeccionParticipacion(eleccion, bfa),
+    eleccion: construirSeccionEleccion(datosBd, bfa),
+    listas: construirSeccionListas(datosBd, bfa),
+    resultados: construirSeccionResultados(datosBd, bfa),
+    participacion: construirSeccionParticipacion(datosBd, bfa),
   };
 
   const valoresSecciones = Object.values(secciones);

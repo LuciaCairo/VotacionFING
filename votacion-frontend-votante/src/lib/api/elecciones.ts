@@ -126,12 +126,12 @@ export function obtenerDetalleEleccionRequest(
 /**
  * Contrato de GET /api/votante/elecciones/:id/comprobante (ver
  * votacion-backend/src/modules/votante/votante.service.ts, obtenerComprobante).
- * `hash` es el mismo dato que `tx_hash`/`comprobante` de VotarResponse (ambos
- * son `participacion.txHash`) — nunca revela la lista elegida (anonimato).
+ * Constancia de participación: solo elección y fecha. A propósito no trae
+ * ningún hash — con el hash se encuentra la transacción en BFA, que lleva la
+ * lista elegida en claro.
  */
 export interface ComprobanteDTO {
   eleccion: string;
-  hash: string;
   fecha_voto: string;
 }
 
@@ -142,13 +142,10 @@ export function obtenerComprobanteRequest(id: number): Promise<ComprobanteDTO> {
 /**
  * Contrato de POST /api/votante/elecciones/:id/votar (ver
  * votacion-backend/src/modules/votante/votante.service.ts, emitirVoto).
- * `comprobante` y `tx_hash` son el mismo valor (txHash de BFA) devuelto bajo
- * dos nombres — alcanza con mostrar uno solo.
+ * Además del mensaje trae la misma constancia que ComprobanteDTO.
  */
-export interface VotarResponse {
+export interface VotarResponse extends ComprobanteDTO {
   mensaje: string;
-  comprobante: string;
-  tx_hash: string;
 }
 
 /**

@@ -1,7 +1,40 @@
 import { prisma } from '../config/prisma.js';
 import { logger } from '../config/logger.js';
 import { registrarLog } from '../services/log.service.js';
-import { obtenerVotos } from '../services/blockchain.service.js';
+import { obtenerVotos, yaVotoEnContrato } from '../services/blockchain.service.js';
+
+/**
+ * Resuelve las participaciones que quedaron reservadas sin confirmar
+ * (hashPendiente != null): un intento de voto fallo sin saberse si entro a
+ * BFA y el votante no reintento (ver emitirVoto en votante.service.ts).
+ *
+ * Solo se llama con la eleccion ya cerrada en el contrato, cuando ningun
+ * envio en camino puede entrar: si el hash esta registrado, el voto entro y
+ * la participacion se confirma; si no, nunca va a entrar y se borra. En los
+ * dos casos el hash desaparece de la BD.
+ */
+async function resolverParticipacionesPendientes(
+  idEleccion: number,
+  contratoAddress: string,
+): Promise<void> {
+  const pendientes = await prisma.participacion.findMany({
+    where: { idEleccion, hashPendiente: { not: null } },
+    select: { id: true, hashPendiente: true },
+  });
+
+  for (const p of pendientes) {
+    const registrado = await yaVotoEnContrato(contratoAddress, p.hashPendiente as string);
+    if (registrado) {
+      await prisma.participacion.update({ where: { id: p.id }, data: { hashPendiente: null } });
+    } else {
+      await prisma.participacion.delete({ where: { id: p.id } });
+    }
+  }
+
+  if (pendientes.length > 0) {
+    logger.info({ idEleccion, cantidad: pendientes.length }, 'Participaciones pendientes resueltas al cierre');
+  }
+}
 
 /**
  * Toma el snapshot de resultados de una eleccion finalizada: lee los votos
@@ -31,6 +64,12 @@ async function tomarSnapshotResultados(idEleccion: number): Promise<void> {
 
   try {
     const votosPorIndice = await obtenerVotos(eleccion.contratoAddress);
+
+    // obtenerTodosLosVotos() solo responde cuando el ultimo bloque ya paso
+    // fechaCierre, asi que desde aca ningun voto mas puede entrar al contrato
+    // y las reservas pendientes se pueden resolver de forma definitiva. Si
+    // falla, se reintenta junto con el snapshot en la proxima corrida.
+    await resolverParticipacionesPendientes(idEleccion, eleccion.contratoAddress);
 
     const votosPorLista = eleccion.listas.map((lista) => ({
       lista,

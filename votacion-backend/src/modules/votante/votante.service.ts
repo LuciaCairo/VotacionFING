@@ -1,13 +1,18 @@
 import { prisma } from '../../config/prisma.js';
 import { logger } from '../../config/logger.js';
 import {
+  type AppError,
   ConflictoError,
   InternoError,
   NoEncontradoError,
   ProhibidoError,
   ValidacionError,
 } from '../../utils/errors.js';
-import { hashVotante, registrarVoto } from '../../services/blockchain.service.js';
+import {
+  generarHashVoto,
+  registrarVoto,
+  yaVotoEnContrato,
+} from '../../services/blockchain.service.js';
 import { registrarLog } from '../../services/log.service.js';
 
 // ─── GET /api/votante/elecciones/:id ─────────────────────────
@@ -16,7 +21,9 @@ import { registrarLog } from '../../services/log.service.js';
  * Devuelve el detalle de una elección con todas sus listas ordenadas por
  * índice (igual que en el contrato). Solo visible si está publicada o
  * finalizada — las elecciones en estado creada devuelven 404.
- * Incluye ya_voto por consistencia con /vigentes.
+ * Incluye ya_voto por consistencia con /vigentes. Una participación que
+ * todavía no se confirmó en BFA (hashPendiente != null) no cuenta como
+ * ya_voto: así el votante puede reintentar (ver emitirVoto).
  */
 export async function obtenerDetalleEleccion(eleccionId: number, votanteId: number) {
   const eleccion = await prisma.eleccion.findUnique({
@@ -42,7 +49,7 @@ export async function obtenerDetalleEleccion(eleccionId: number, votanteId: numb
     where: {
       uq_participacion_votante_eleccion: { idVotante: votanteId, idEleccion: eleccionId },
     },
-    select: { id: true },
+    select: { hashPendiente: true },
   });
 
   return {
@@ -51,7 +58,7 @@ export async function obtenerDetalleEleccion(eleccionId: number, votanteId: numb
     fecha_inicio: eleccion.fechaInicio.toISOString(),
     fecha_cierre: eleccion.fechaCierre.toISOString(),
     estado: eleccion.estado,
-    ya_voto: participacion !== null,
+    ya_voto: participacion !== null && participacion.hashPendiente === null,
     listas: eleccion.listas.map((l) => ({
       id: l.id,
       nombre: l.nombre,
@@ -96,6 +103,7 @@ export async function obtenerEleccionesVigentes(votanteId: number) {
     where: {
       idVotante: votanteId,
       idEleccion: { in: elecciones.map((e) => e.id) },
+      hashPendiente: null, // solo confirmadas, igual que en obtenerDetalleEleccion
     },
     select: { idEleccion: true },
   });
@@ -180,8 +188,13 @@ export async function obtenerEleccionesFinalizadas() {
 // ─── GET /api/votante/elecciones/:id/comprobante ─────────────
 
 /**
- * Devuelve el comprobante del voto del votante en la elección indicada.
- * Solo confirma participación; nunca revela la lista elegida (HU-07).
+ * Devuelve la constancia de participación del votante en la elección (HU-07).
+ *
+ * Es solo eso: elección y fecha. A propósito no incluye el tx hash ni el
+ * hash del voto — cualquier dato que permita encontrar la transacción en BFA
+ * permite leer la lista elegida (va en claro en la transacción), y con eso el
+ * votante podría demostrarle a un tercero a quién votó (venta o coacción del
+ * voto).
  */
 export async function obtenerComprobante(eleccionId: number, votanteId: number) {
   const participacion = await prisma.participacion.findUnique({
@@ -189,19 +202,18 @@ export async function obtenerComprobante(eleccionId: number, votanteId: number) 
       uq_participacion_votante_eleccion: { idVotante: votanteId, idEleccion: eleccionId },
     },
     select: {
-      txHash: true,
+      hashPendiente: true,
       fechaVoto: true,
       eleccion: { select: { nombre: true } },
     },
   });
 
-  if (!participacion) {
+  if (!participacion || participacion.hashPendiente !== null) {
     throw new NoEncontradoError('No tenés un comprobante para esta elección.');
   }
 
   return {
     eleccion: participacion.eleccion.nombre,
-    hash: participacion.txHash,
     fecha_voto: participacion.fechaVoto.toISOString(),
   };
 }
@@ -235,6 +247,115 @@ function extraerMotivoRevert(err: unknown): string {
   return '';
 }
 
+// ─── Helper: rechazos del contrato por reglas de validación ──
+// Con estos motivos el contrato rechazó el voto (no entró a la cadena) y
+// reintentar daría lo mismo. Devuelve null para cualquier otro motivo —
+// incluido "ya voto", que no es un rechazo definitivo sino una señal de que
+// otro envío con el mismo hash ya entró (ver emitirVoto).
+function errorPorRechazoDelContrato(
+  motivo: string,
+  err: unknown,
+  eleccionId: number,
+): AppError | null {
+  if (motivo.includes('todavia no empezo')) {
+    logger.warn({ eleccionId }, 'BFA: revert — elección aún no abierta según contrato');
+    return new ConflictoError('La elección todavía no está abierta para votar.');
+  }
+  if (motivo.includes('ya termino')) {
+    logger.warn({ eleccionId }, 'BFA: revert — elección finalizada según contrato');
+    return new ConflictoError('La elección ya finalizó.');
+  }
+  if (motivo.includes('Lista invalida')) {
+    logger.warn({ eleccionId }, 'BFA: revert — índice de lista inválido según contrato');
+    return new ValidacionError('El índice de lista no es válido para esta elección.');
+  }
+  if (motivo.includes('backend autorizado')) {
+    // Problema de configuración: la clave del backend no coincide con la registrada en el contrato.
+    logger.error({ err, eleccionId }, 'BFA: revert — backend no autorizado (CRÍTICO: revisar BACKEND_PRIVATE_KEY)');
+    return new InternoError('Error de configuración del sistema de votación.');
+  }
+  return null;
+}
+
+// ─── Helper: reserva y confirmación de la participación ──────
+
+interface ReservaParticipacion {
+  id: number;
+  /** Hash aleatorio con el que se envía el voto (ver generarHashVoto). */
+  hash: string;
+  /** false = se retomó la reserva de un intento anterior que quedó sin confirmar. */
+  creadaAhora: boolean;
+}
+
+/**
+ * Reserva la participación del votante ANTES de enviar el voto a BFA.
+ *
+ * Con hashes aleatorios el contrato ya no puede saber que dos votos son de
+ * la misma persona, así que el doble voto lo frena el UNIQUE(idVotante,
+ * idEleccion) de PARTICIPACION: dos pedidos simultáneos no pueden crear dos
+ * reservas.
+ *
+ * Si ya hay una reserva sin confirmar (un intento anterior falló sin que se
+ * sepa si el voto entró), se retoma con su mismo hash: si aquel voto había
+ * entrado, el contrato rechaza este con "ya voto" en vez de contar dos.
+ */
+async function reservarParticipacion(
+  votanteId: number,
+  eleccionId: number,
+): Promise<ReservaParticipacion> {
+  const clave = {
+    uq_participacion_votante_eleccion: { idVotante: votanteId, idEleccion: eleccionId },
+  };
+
+  const retomar = (p: { id: number; hashPendiente: string | null }): ReservaParticipacion => {
+    if (p.hashPendiente === null) {
+      throw new ConflictoError('Ya emitiste tu voto en esta elección.');
+    }
+    return { id: p.id, hash: p.hashPendiente, creadaAhora: false };
+  };
+
+  const existente = await prisma.participacion.findUnique({
+    where: clave,
+    select: { id: true, hashPendiente: true },
+  });
+  if (existente) return retomar(existente);
+
+  const hash = generarHashVoto();
+  try {
+    const creada = await prisma.participacion.create({
+      data: { idVotante: votanteId, idEleccion: eleccionId, hashPendiente: hash },
+      select: { id: true },
+    });
+    return { id: creada.id, hash, creadaAhora: true };
+  } catch (err) {
+    if ((err as { code?: string })?.code !== 'P2002') throw err;
+    // Otro pedido del mismo votante reservó entre la lectura y el create
+    // (doble clic): se retoma esa reserva.
+    const otra = await prisma.participacion.findUnique({
+      where: clave,
+      select: { id: true, hashPendiente: true },
+    });
+    if (!otra) {
+      throw new ConflictoError('Tu voto se está procesando. Recargá la página en unos segundos.');
+    }
+    return retomar(otra);
+  }
+}
+
+/**
+ * Marca la participación como confirmada borrando el hash. Desde acá la BD
+ * solo sabe QUE el votante votó y cuándo — no cuál de las transacciones del
+ * contrato es la suya.
+ */
+async function confirmarParticipacion(id: number): Promise<Date> {
+  const confirmada = await prisma.participacion.update({
+    where: { id },
+    data: { hashPendiente: null },
+    select: { fechaVoto: true },
+  });
+  return confirmada.fechaVoto;
+}
+
 // ─── POST /api/votante/elecciones/:id/votar ───────────────────
 
 /**
@@ -246,16 +367,19 @@ function extraerMotivoRevert(err: unknown): string {
  *   3. Votante no votó ya en esta elección (PARTICIPACION).
  *   4. indice_lista es válido para la elección.
  *
- * Lógica de emisión:
- *   - Calcula hashVotante = keccak256(legajo + idEleccion + SALT_SECRETO).
- *   - Llama al contrato en BFA: votar(indice_lista, hashVotante).
- *   - Solo si BFA confirma la TX, registra PARTICIPACION en BD.
- *   - Nunca almacena la lista elegida; preserva el anonimato.
+ * Lógica de emisión (anonimato del voto):
+ *   - Reserva PARTICIPACION con un hash aleatorio (ver reservarParticipacion).
+ *   - Llama al contrato en BFA: votar(indice_lista, hash).
+ *   - Al confirmarse, borra el hash de PARTICIPACION. La transacción lleva la
+ *     lista elegida en claro, así que la BD no guarda nada que permita
+ *     encontrarla (ni el hash del voto ni el tx hash), y el votante tampoco
+ *     recibe ese dato: su constancia es solo de participación.
+ *   - Nunca almacena la lista elegida.
  *
- * Condición de carrera: el contrato rechaza hashes duplicados con
- * require(!yaVoto[hash]). A nivel BD, UNIQUE(idVotante, idEleccion)
- * en PARTICIPACION es la segunda barrera. Ambas errores se traducen
- * a 409 para que el votante no quede en estado de error indefinido.
+ * Doble voto: lo frena el UNIQUE(idVotante, idEleccion) al reservar. Los
+ * reintentos reutilizan el hash de la reserva y el contrato rechaza un hash
+ * repetido con require(!yaVoto[hash]), así que un reintento nunca suma un
+ * segundo voto aunque el intento anterior haya entrado sin que lo supiéramos.
  */
 export async function emitirVoto(
   eleccionId: number,
@@ -268,6 +392,7 @@ export async function emitirVoto(
     where: { id: eleccionId },
     select: {
       id: true,
+      nombre: true,
       estado: true,
       fechaInicio: true,
       fechaCierre: true,
@@ -307,112 +432,98 @@ export async function emitirVoto(
   // ── 3. Votante en el padrón ──────────────────────────────────
   const votante = await prisma.votante.findUnique({
     where: { id: votanteId },
-    select: { id: true, legajo: true, activo: true },
+    select: { id: true, activo: true },
   });
 
   if (!votante || !votante.activo) {
     throw new ProhibidoError('No estás habilitado para votar en esta elección.');
   }
 
-  // ── 4. No votó todavía ───────────────────────────────────────
-  const participacionExistente = await prisma.participacion.findUnique({
-    where: {
-      uq_participacion_votante_eleccion: { idVotante: votanteId, idEleccion: eleccionId },
-    },
-    select: { id: true },
-  });
+  // ── 4. Reservar la participación ─────────────────────────────
+  // Corta con 409 si ya votó; si no, frena el doble voto antes de tocar BFA
+  // (ver reservarParticipacion).
+  const reserva = await reservarParticipacion(votanteId, eleccionId);
 
-  if (participacionExistente) {
-    throw new ConflictoError('Ya emitiste tu voto en esta elección.');
-  }
-
-  // ── 5. Hash anónimo del votante ──────────────────────────────
-  // keccak256(legajo + idEleccion + SALT_SECRETO): incluir el id de la elección
-  // garantiza que el mismo votante genera un hash distinto en cada elección,
-  // impidiendo correlacionar comportamiento entre elecciones (ataque de correlación).
-  // Sigue siendo determinístico dentro de la elección para que el contrato
-  // detecte el doble voto con require(!yaVoto[hash]).
-  const hash = hashVotante(votante.legajo, eleccionId);
-
-  // ── 6. Emitir voto en BFA ────────────────────────────────────
-  // Si falla, el votante NO queda marcado como que votó; puede reintentar.
-  let txHash: string;
+  // ── 5. Emitir voto en BFA ────────────────────────────────────
   try {
-    const resultado = await registrarVoto({
+    await registrarVoto({
       contratoAddress: eleccion.contratoAddress,
       idLista: indiceLista,
-      hash,
+      hash: reserva.hash,
     });
-    txHash = resultado.txHash;
   } catch (err) {
     const esRevert = (err as { code?: string })?.code === 'CALL_EXCEPTION';
+    const motivo = esRevert ? extraerMotivoRevert(err) : '';
 
-    if (esRevert) {
-      // Revert del contrato: no reintentable. Mapeamos los mensajes conocidos.
-      const motivo = extraerMotivoRevert(err);
+    // a) Rechazo por una regla del contrato: el voto no entró y reintentar no
+    //    cambia nada. Se libera la reserva para que el votante quede como
+    //    "no votó" — salvo que venga de un intento anterior, cuyo envío
+    //    podría seguir en camino.
+    const rechazo = esRevert ? errorPorRechazoDelContrato(motivo, err, eleccionId) : null;
+    if (rechazo) {
+      if (reserva.creadaAhora) {
+        await prisma.participacion.delete({ where: { id: reserva.id } });
+      }
+      throw rechazo;
+    }
 
-      if (motivo.includes('ya voto')) {
-        // BFA detectó doble voto aunque PARTICIPACION no lo tenía (inconsistencia o race).
-        logger.warn({ eleccionId }, 'BFA: doble voto detectado por el contrato');
-        throw new ConflictoError('Ya emitiste tu voto en esta elección.');
-      }
-      if (motivo.includes('todavia no empezo')) {
-        logger.warn({ eleccionId }, 'BFA: revert — elección aún no abierta según contrato');
-        throw new ConflictoError('La elección todavía no está abierta para votar.');
-      }
-      if (motivo.includes('ya termino')) {
-        logger.warn({ eleccionId }, 'BFA: revert — elección finalizada según contrato');
-        throw new ConflictoError('La elección ya finalizó.');
-      }
-      if (motivo.includes('Lista invalida')) {
-        logger.warn({ eleccionId }, 'BFA: revert — índice de lista inválido según contrato');
-        throw new ValidacionError('El índice de lista no es válido para esta elección.');
-      }
-      if (motivo.includes('backend autorizado')) {
-        // Problema de configuración: la clave del backend no coincide con la registrada en el contrato.
-        logger.error({ err, eleccionId }, 'BFA: revert — backend no autorizado (CRÍTICO: revisar BACKEND_PRIVATE_KEY)');
-        throw new InternoError('Error de configuración del sistema de votación.');
-      }
+    // b) Resultado incierto: error de red/timeout (la transacción pudo haber
+    //    entrado igual), revert sin motivo legible, o "ya voto" (entró otro
+    //    envío con este mismo hash: un intento anterior o un doble clic).
+    //    Se le pregunta al contrato si el hash quedó registrado.
+    let registrado = false;
+    try {
+      registrado = await yaVotoEnContrato(eleccion.contratoAddress, reserva.hash);
+    } catch (errConsulta) {
+      logger.error({ err: errConsulta, eleccionId }, 'BFA: no se pudo consultar si el voto quedó registrado');
+    }
 
-      // Revert con motivo desconocido: loguear para investigar.
-      logger.error({ err, eleccionId, motivo }, 'BFA: revert desconocido del contrato');
+    if (!registrado && motivo.includes('ya voto')) {
+      // El nodo ya tiene en cola (sin minar) otro envío con este hash — un
+      // doble clic: estimateGas ve las transacciones pendientes, la consulta
+      // de arriba solo el último bloque. Ese otro pedido confirma la
+      // participación cuando su transacción entre; esta reserva no se toca.
+      logger.warn({ eleccionId }, 'BFA: el hash ya está en camino en otro envío; se rechaza el duplicado');
+      throw new ConflictoError('Tu voto ya se está registrando. Recargá la página en unos segundos.');
+    }
+
+    if (!registrado) {
+      // La reserva queda pendiente con su hash: el reintento lo reutiliza,
+      // así que no puede sumar un segundo voto aunque este entre tarde. Si
+      // nadie reintenta, se resuelve al cerrar la elección (ver
+      // resolverParticipacionesPendientes en eleccion.job.ts).
+      logger.error({ err, eleccionId, motivo }, 'BFA: no se pudo confirmar el voto; la reserva queda pendiente');
       throw new InternoError(
         'No se pudo registrar el voto en la blockchain. Podés intentar nuevamente.',
       );
     }
 
-    // Error de infraestructura (red, timeout, gas, nonce, provider): reintentable.
-    logger.error({ err, eleccionId }, 'BFA: error de infraestructura al registrar voto');
-    throw new InternoError(
-      'No se pudo registrar el voto en la blockchain. Podés intentar nuevamente.',
-    );
-  }
-
-  // ── 7. Registrar participación en BD ─────────────────────────
-  // Solo se ejecuta si BFA confirmó la transacción.
-  // NUNCA se guarda la lista elegida — solo quién participó y cuándo.
-  try {
-    await prisma.participacion.create({
-      data: {
-        idVotante: votanteId,
-        idEleccion: eleccionId,
-        hashBlockchain: hash,
-        txHash,
-      },
-    });
-  } catch (err) {
-    // P2002 = violación de UNIQUE(idVotante, idEleccion): race condition resuelta.
-    if ((err as { code?: string })?.code === 'P2002') {
+    if (esRevert || !reserva.creadaAhora) {
+      // Lo que quedó registrado es otro envío con el mismo hash, no este.
+      logger.warn({ eleccionId }, 'BFA: el hash ya estaba registrado; se confirma la participación');
+      await confirmarParticipacion(reserva.id);
       throw new ConflictoError('Ya emitiste tu voto en esta elección.');
     }
-    // El voto quedó en BFA pero no se pudo guardar el comprobante en BD.
-    logger.error({ err, eleccionId, txHash }, 'Fallo al registrar participacion en BD post-BFA');
+
+    // Este mismo envío entró aunque falló la espera de la confirmación: se
+    // sigue como un voto exitoso.
+    logger.warn({ eleccionId }, 'BFA: el voto entró pese al error al esperar la confirmación');
+  }
+
+  // ── 6. Confirmar la participación ────────────────────────────
+  let fechaVoto: Date;
+  try {
+    fechaVoto = await confirmarParticipacion(reserva.id);
+  } catch (err) {
+    // El voto ya está en BFA. La reserva queda pendiente y se resuelve sola:
+    // en un reintento (el contrato responde "ya voto") o al cerrar la elección.
+    logger.error({ err, eleccionId }, 'Fallo al confirmar la participación en BD post-BFA');
     throw new InternoError(
-      'El voto quedó registrado en la blockchain, pero hubo un error al guardar el comprobante. Contactá a soporte con el tx_hash.',
+      'Tu voto quedó registrado en la blockchain, pero hubo un error al guardar tu constancia. Intentá nuevamente en unos minutos: el sistema va a reconocer tu voto sin contarlo dos veces.',
     );
   }
 
-  // ── 8. Log de auditoría ──────────────────────────────────────
+  // ── 7. Log de auditoría ──────────────────────────────────────
   // Solo registra que hubo un voto en la elección; nunca la lista elegida.
   void registrarLog({
     tipoEvento: 'voto_emitido',
@@ -422,9 +533,10 @@ export async function emitirVoto(
     ip,
   });
 
+  // Constancia de participación: lo mismo que devuelve GET .../comprobante.
   return {
     mensaje: 'Voto registrado correctamente',
-    comprobante: txHash,
-    tx_hash: txHash,
+    eleccion: eleccion.nombre,
+    fecha_voto: fechaVoto.toISOString(),
   };
 }

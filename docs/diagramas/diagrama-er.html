@@ -429,10 +429,9 @@
           <li class="field is-fk"><span class="field__key fk">FK</span><span class="field__row"><span class="field__name">idVotante</span><span class="field__type">Int</span></span></li>
           <li class="field is-fk"><span class="field__key fk">FK</span><span class="field__row"><span class="field__name">idEleccion</span><span class="field__type">Int</span></span></li>
           <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">fechaVoto</span><span class="field__type">DateTime</span><span class="field__default">= now()</span></span></li>
-          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">hashBlockchain</span><span class="field__type">String @db.VarChar(255)</span></span></li>
-          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">txHash</span><span class="field__type">String @db.VarChar(255)</span></span></li>
+          <li class="field"><span class="field__key"></span><span class="field__row"><span class="field__name">hashPendiente</span><span class="field__type">String? @db.VarChar(66)</span></span></li>
         </ul>
-        <div class="entity__note"><b style="color:var(--ink)">UK</b> compuesta <code>(idVotante, idEleccion)</code> — evita doble voto. Deliberadamente <b style="color:var(--ink)">sin FK hacia Lista</b>: preserva el anonimato de a quién se votó.</div>
+        <div class="entity__note"><b style="color:var(--ink)">UK</b> compuesta <code>(idVotante, idEleccion)</code> — evita doble voto. Deliberadamente <b style="color:var(--ink)">sin FK hacia Lista</b> y sin el tx hash del voto: preserva el anonimato de a quién se votó. <code>hashPendiente</code> solo existe mientras el voto no se confirmó en BFA (null = confirmada).</div>
       </div>
 
       <div class="entity" id="ent-lista" style="grid-column:3; grid-row:2;">

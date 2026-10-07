@@ -158,17 +158,21 @@ model Votante {
 
 // ─── PARTICIPACION ───────────────────────────────────────────
 // Registra QUIEN voto en QUE eleccion y cuando. NUNCA a que lista.
-// Intencionalmente NO tiene FK hacia LISTA (preserva el anonimato).
+// Intencionalmente NO tiene FK hacia LISTA (preserva el anonimato), y
+// tampoco guarda nada que identifique la transaccion del voto en BFA: la
+// transaccion lleva la lista en claro, asi que cualquier vinculo
+// participacion -> transaccion revelaria el voto.
 
 model Participacion {
-  id             Int      @id @default(autoincrement())
-  idVotante      Int      @map("id_votante")
-  idEleccion     Int      @map("id_eleccion")
-  fechaVoto      DateTime @default(now()) @map("fecha_voto")
-  // Hash bytes32 = keccak256(legajo + SALT_SECRETO). Comprobante anonimo.
-  hashBlockchain String   @map("hash_blockchain") @db.VarChar(255)
-  // Hash de la transaccion en BFA (verificable en el explorador).
-  txHash         String   @map("tx_hash") @db.VarChar(255)
+  id            Int      @id @default(autoincrement())
+  idVotante     Int      @map("id_votante")
+  idEleccion    Int      @map("id_eleccion")
+  fechaVoto     DateTime @default(now()) @map("fecha_voto")
+  // Hash aleatorio (bytes32) del voto mientras todavia no esta confirmado en
+  // BFA. Se reutiliza si hay que reintentar (el contrato rechaza un hash
+  // repetido, asi que un reintento nunca suma un segundo voto) y se borra
+  // (null) al confirmarse. null = participacion confirmada.
+  hashPendiente String?  @map("hash_pendiente") @db.VarChar(66)
 
   // ON DELETE RESTRICT: no se puede borrar un votante o eleccion con votos.
   votante  Votante  @relation(fields: [idVotante], references: [id], onDelete: Restrict)

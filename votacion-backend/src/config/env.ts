@@ -43,11 +43,6 @@ const envSchema = z.object({
   SALDO_UMBRAL_ADVERTENCIA: z.coerce.number().positive().default(0.5),
   SALDO_UMBRAL_CRITICO: z.coerce.number().positive().default(0.1),
 
-  // Secreto del voto
-  SALT_SECRETO: z
-    .string()
-    .min(16, 'SALT_SECRETO debe tener al menos 16 caracteres'),
-
   // Seguridad / login
   LOGIN_MAX_INTENTOS: z.coerce.number().int().positive().default(5),
   LOGIN_BLOQUEO_SEGUNDOS: z.coerce.number().int().positive().default(600),

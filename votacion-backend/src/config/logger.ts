@@ -17,7 +17,6 @@ export const logger = pino({
       'passwordHash',
       '*.passwordHash',
       'BACKEND_PRIVATE_KEY',
-      'SALT_SECRETO',
       'token',
       '*.token',
       'authorization',

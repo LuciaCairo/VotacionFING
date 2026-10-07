@@ -9,7 +9,7 @@ import { InternoError } from '../utils/errors.js';
  * Servicio de blockchain. Unico punto del sistema que interactua con BFA.
  * Encapsula:
  *   - El provider (lectura) y el signer (firma de transacciones).
- *   - El calculo del hash anonimo del votante con salt secreto.
+ *   - La generacion del hash aleatorio de cada voto.
  *   - Deploy de contratos, registro de votos y lectura de resultados.
  */
 
@@ -24,15 +24,20 @@ const provider = new ethers.JsonRpcProvider(env.BFA_RPC_URL, {
 const signer = new ethers.Wallet(env.BACKEND_PRIVATE_KEY, provider);
 
 /**
- * Hash anonimo del votante: keccak256(legajo + idEleccion + SALT_SECRETO).
- * Incluir el idEleccion hace que el mismo votante genere un hash distinto en
- * cada eleccion, impidiendo correlacionar su comportamiento entre elecciones.
- * El hash sigue siendo determinístico dentro de una eleccion (mismo votante +
- * misma eleccion = mismo hash), lo que permite al contrato detectar doble voto.
- * Sin el salt no es posible reconstruir la correspondencia legajo->hash.
+ * Hash del voto: 32 bytes aleatorios, sin relacion con el votante.
+ *
+ * Antes era keccak256(legajo + idEleccion + SALT_SECRETO). Como la
+ * transaccion `votar(idLista, hash)` es publica y lleva la lista en claro,
+ * cualquiera con el salt y el padron podia recalcular el hash de cada
+ * votante, encontrar su transaccion y leer a quien voto — para siempre,
+ * porque la cadena no se borra. Un hash aleatorio no se puede reconstruir.
+ *
+ * El doble voto lo frena la BD (UNIQUE en PARTICIPACION, que se reserva
+ * antes de enviar). El contrato sigue rechazando un hash repetido, y eso es
+ * lo que hace seguro reintentar: un reintento reutiliza el mismo hash.
  */
-export function hashVotante(legajo: string, idEleccion: number): string {
-  return ethers.keccak256(ethers.toUtf8Bytes(legajo + idEleccion + env.SALT_SECRETO));
+export function generarHashVoto(): string {
+  return ethers.hexlify(ethers.randomBytes(32));
 }
 
 // ─── Cola de envio: serializa firmar+enviar Y lleva el nonce ─
@@ -152,21 +157,21 @@ function contratoEscritura(address: string): ethers.Contract {
  * El contrato valida internamente: solo backend, eleccion activa,
  * no doble voto y lista valida.
  *
- * @returns el hash de la transaccion confirmada.
+ * No devuelve el tx hash a proposito: la transaccion lleva la lista en
+ * claro, asi que el tx hash no se guarda ni se le muestra a nadie.
  */
 export async function registrarVoto(params: {
   contratoAddress: string;
   idLista: number;
   hash: string;
-}): Promise<{ txHash: string }> {
+}): Promise<void> {
   const contrato = contratoEscritura(params.contratoAddress);
   // Encolado: ver encolarEnvio arriba — evita que dos votos (o un voto y un
   // deploy) concurrentes pidan el mismo nonce al mismo tiempo.
   const tx = await encolarEnvio((nonce) =>
     contrato.votar(params.idLista, params.hash, { nonce }),
   );
-  const recibo = await tx.wait();
-  return { txHash: recibo?.hash ?? tx.hash };
+  await tx.wait();
 }
 
 /** Lee el conteo de votos por lista directamente del contrato. */

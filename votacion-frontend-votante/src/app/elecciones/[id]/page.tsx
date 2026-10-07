@@ -12,7 +12,7 @@ import { clearVotanteSession } from "@/lib/auth/session";
 import { formatFechaHora } from "@/lib/format";
 import { BoletaListaOption } from "@/components/votante/boleta-lista-option";
 import { ConfirmarVotoDialog } from "@/components/votante/confirmar-voto-dialog";
-import { ComprobanteHash } from "@/components/votante/comprobante-hash";
+import { ConstanciaParticipacion } from "@/components/votante/constancia-participacion";
 
 const RUTA_VOTANTE_HOME = "/votante";
 
@@ -187,12 +187,15 @@ function VotoExitosoView({
           ¡Tu voto fue registrado!
         </div>
         <div className="mt-1 text-[13.5px] text-[#5b6b7c]">
-          Guardá tu comprobante para poder verificarlo más adelante.
+          Quedó registrado en la blockchain de forma anónima.
         </div>
       </div>
 
       <div className="w-full max-w-[420px]">
-        <ComprobanteHash hash={respuesta.tx_hash} />
+        <ConstanciaParticipacion
+          eleccion={respuesta.eleccion}
+          fechaVoto={respuesta.fecha_voto}
+        />
       </div>
 
       <div className="text-[13px] text-[#5b6b7c]">
@@ -298,7 +301,7 @@ function EleccionFinalizadaView({ eleccion }: { eleccion: EleccionDetalleDTO }) 
   );
 }
 
-// ─── Camino B: ya votó (solo comprobante, nunca la lista elegida) ─────
+// ─── Camino B: ya votó (solo constancia, nunca la lista elegida) ─────
 
 function YaVotoView({ eleccion }: { eleccion: EleccionDetalleDTO }) {
   const router = useRouter();
@@ -325,7 +328,7 @@ function YaVotoView({ eleccion }: { eleccion: EleccionDetalleDTO }) {
       {comprobante.isPending ? (
         <div
           aria-hidden="true"
-          className="h-[92px] w-full max-w-[420px] animate-pulse rounded-[12px] bg-white/70"
+          className="h-[150px] w-full max-w-[420px] animate-pulse rounded-[12px] bg-white/70"
         />
       ) : comprobante.isError ? (
         <ErrorState
@@ -333,18 +336,12 @@ function YaVotoView({ eleccion }: { eleccion: EleccionDetalleDTO }) {
           onRetry={() => comprobante.refetch()}
         />
       ) : (
-        <>
-          <div className="w-full max-w-[420px]">
-            <ComprobanteHash hash={comprobante.data.hash} />
-          </div>
-          <div className="text-[13px] text-[#5b6b7c]">
-            Votaste el{" "}
-            <strong className="text-[#0a2540]">
-              {formatFechaHora(comprobante.data.fecha_voto)}
-            </strong>
-            .
-          </div>
-        </>
+        <div className="w-full max-w-[420px]">
+          <ConstanciaParticipacion
+            eleccion={comprobante.data.eleccion}
+            fechaVoto={comprobante.data.fecha_voto}
+          />
+        </div>
       )}
 
       <button

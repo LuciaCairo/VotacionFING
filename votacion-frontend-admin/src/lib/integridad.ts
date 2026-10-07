@@ -88,11 +88,11 @@ const CAMPO_LABELS: Record<string, string> = {
   total_votos: "Total de Votos",
   "cantidad_participaciones vs. total de votos en el contrato":
     "Cantidad de Participaciones vs. Total de Votos en el Contrato",
+  "participaciones sin confirmar": "Participaciones sin Confirmar",
 };
 
 const RE_LISTA_NOMBRE = /^lista\[(\d+)\]\.nombre$/;
 const RE_VOTOS_LISTA = /^votos\["(.+)"\] \(índice (\d+)\)$/;
-const RE_YA_VOTO = /^yaVotoEstaPersona — participación #(\d+)$/;
 
 /**
  * Traduce el `campo` técnico que devuelve el backend (ver admin.service.ts,
@@ -114,9 +114,6 @@ export function formatCampoIntegridad(raw: string): string {
 
   const votos = raw.match(RE_VOTOS_LISTA);
   if (votos) return `Votos "${votos[1]}" (índice ${votos[2]})`;
-
-  const yaVoto = raw.match(RE_YA_VOTO);
-  if (yaVoto) return `¿Ya Votó Esta Persona? — Participación #${yaVoto[1]}`;
 
   return raw;
 }

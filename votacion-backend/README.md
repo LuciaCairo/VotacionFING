@@ -16,7 +16,7 @@ El backend está **completo y probado**:
 - ✅ Estructura de carpetas y configuración (`package.json`, `tsconfig`, env tipado con Zod).
 - ✅ Esquema Prisma completo (7 tablas, enums, restricciones `UNIQUE` compuestas y FKs).
 - ✅ Configuración base: env, logger (Pino), Prisma, Redis.
-- ✅ Servicio de blockchain (deploy, voto, lectura de resultados, hash con salt).
+- ✅ Servicio de blockchain (deploy, voto, lectura de resultados, hash aleatorio por voto).
 - ✅ Plugins: autenticación JWT + lista negra, guard por rol, manejo de errores global.
 - ✅ **Módulo de autenticación completo** (login votante, login admin, logout) con bloqueo
   de 5 intentos / 10 minutos en Redis.
@@ -27,7 +27,7 @@ El backend está **completo y probado**:
   (`GET /api/admin/elecciones/:id/participacion/descargar`), saldo de la cuenta
   blockchain (`GET /api/admin/blockchain/saldo`).
 - ✅ **Módulo votante completo**: elecciones vigentes/finalizadas, detalle, emisión de
-  voto y comprobante (`/api/votante/elecciones/...`).
+  voto y constancia de participación (`/api/votante/elecciones/...`).
 - ✅ Endpoint compartido admin/votante de resultados de una elección finalizada
   (`GET /api/elecciones/:id/resultados`).
 - ✅ Cron jobs de transición de estados de elecciones.
@@ -57,7 +57,7 @@ npm install
 
 # 2. Configurar variables de entorno
 cp .env.example .env
-#    → completar DATABASE_URL, REDIS_URL, JWT_SECRET, SALT_SECRETO,
+#    → completar DATABASE_URL, REDIS_URL, JWT_SECRET,
 #      BACKEND_PRIVATE_KEY, BACKEND_ADDRESS y VOTACION_BYTECODE.
 
 # 3. Generar el cliente Prisma y aplicar el esquema
@@ -128,8 +128,28 @@ prisma/
 
 ## Notas de seguridad
 
-- El **salt** del voto (`SALT_SECRETO`) y la **clave privada** del backend nunca van al
-  repo ni a los logs (el logger los redacta).
+- La **clave privada** del backend nunca va al repo ni a los logs (el logger la redacta).
+- **Anonimato del voto.** La transacción `votar(idLista, hash)` es pública y lleva
+  la lista en claro, así que el sistema evita cualquier vínculo entre un votante y
+  su transacción:
+  - El `hash` de cada voto son 32 bytes aleatorios. Antes era
+    `keccak256(legajo + idEleccion + SALT_SECRETO)`: con el salt y el padrón se
+    podía recalcular el hash de cada votante y leer su voto en la cadena, para
+    siempre. `SALT_SECRETO` ya no existe.
+  - `PARTICIPACION` no guarda el tx hash ni el hash del voto. Se reserva **antes**
+    de enviar el voto (el `UNIQUE(id_votante, id_eleccion)` frena el doble voto) con
+    un `hash_pendiente` que se borra al confirmarse. Si un envío falla sin saberse
+    si entró, el reintento reutiliza ese hash y el contrato rechaza el repetido, así
+    que nunca se cuentan dos votos. Las reservas que nadie reintentó se resuelven
+    contra el contrato al cerrar la elección (job de snapshot).
+  - El votante recibe una **constancia de participación** (elección y fecha), no el
+    tx hash: con él podría demostrarle a otro a quién votó.
+  - La auditoría de integridad compara la **cantidad** de participaciones contra el
+    total de votos del contrato, en vez de verificar votante por votante.
+  - Limitación que queda: la hora de cada voto (`fecha_voto`, tabla `LOG`) se
+    puede cruzar con la hora del bloque de cada transacción. Con poco tráfico eso
+    alcanza para identificar votos a quien tenga acceso a la BD. Mitigarlo
+    requiere enviar los votos en lotes mezclados (trabajo futuro).
 - Las contraseñas se hashean con bcrypt; los JWT se firman con `JWT_SECRET`.
 - El control de acceso por rol se aplica en cada endpoint protegido.
 - Resultados — estrategia híbrida: al finalizar una elección, el job de cron toma
@@ -168,8 +188,8 @@ prisma/
   proceso de Node — correr el backend en más de una instancia a la vez
   reintroduciría la condición de carrera (haría falta un lock compartido, ej. Redis).
 - Limitaciones de seguridad conocidas, documentadas mas no mitigadas (decisión
-  explícita, fuera del alcance de esta tesina): el backend puede calcular el hash
-  anónimo de cualquier votante sin su clave (firmante único → voto fantasma
+  explícita, fuera del alcance de esta tesina): el backend firma todos los votos
+  sin intervención criptográfica del votante (firmante único → voto fantasma
   teórico si el backend estuviera comprometido); los roles de BD/Redis no siguen
   mínimo privilegio; se confía en que el nodo RPC de BFA no mienta (inherente a
   blockchain permisionada); un admin puede vaciar el saldo de gas creando
