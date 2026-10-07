@@ -218,7 +218,10 @@ export async function verificarResultadosEnBfa(eleccionId: number) {
   const cantidadIndices = Math.max(eleccion.listas.length, nombresContrato.length);
   const listas = Array.from({ length: cantidadIndices }, (_, indice) => {
     const listaBd = eleccion.listas.find((l) => l.indice === indice);
-    const votosPublicados = listaBd ? (listaBd.resultados[0]?.votos ?? 0) : null;
+    // Sin fila en RESULTADO no hay un número publicado que comparar: null
+    // (discrepancia), como en la integridad del admin — no 0, que podría
+    // "coincidir" con una lista sin votos en el contrato.
+    const votosPublicados = listaBd?.resultados[0]?.votos ?? null;
     const nombreContrato = nombresContrato[indice] ?? null;
     const votosEnContrato = votosContrato[indice] ?? null;
     return {
@@ -230,6 +233,7 @@ export async function verificarResultadosEnBfa(eleccionId: number) {
       coincide:
         listaBd !== undefined &&
         listaBd.nombre === nombreContrato &&
+        votosPublicados !== null &&
         votosPublicados === votosEnContrato,
     };
   });
