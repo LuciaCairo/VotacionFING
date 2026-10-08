@@ -174,6 +174,57 @@ export async function registrarVoto(params: {
   await tx.wait();
 }
 
+/**
+ * Verifica que en `address` este el contrato de ESTA eleccion antes de
+ * mandarle un voto. Devuelve null si coincide, o el motivo si no.
+ *
+ * El contrato solo se defiende a si mismo: en una address sin codigo una
+ * transaccion `votar()` se mina igual (no hay codigo que la rechace) y el
+ * voto no se cuenta en ningun lado; y el contrato de OTRA eleccion del
+ * sistema tambien acepta a este backend, asi que el voto se contaria en la
+ * eleccion equivocada. La address sale de la BD: no se la puede dar por
+ * buena sin mirar que hay del otro lado.
+ *
+ * Los errores de red o del nodo se propagan: no son un "no coincide".
+ */
+export async function verificarContratoDeEleccion(
+  address: string,
+  esperado: { nombre: string; fechaAperturaUnix: number; fechaCierreUnix: number },
+): Promise<string | null> {
+  if (!ethers.isAddress(address)) return `la direccion ${address} no es valida`;
+  if ((await provider.getCode(address)) === '0x') return `no hay ningun contrato en ${address}`;
+
+  const contrato = contratoLectura(address);
+  let backend: string, nombre: string, apertura: bigint, cierre: bigint;
+  try {
+    [backend, nombre, apertura, cierre] = await Promise.all([
+      contrato.backend(),
+      contrato.nombreEleccion(),
+      contrato.fechaApertura(),
+      contrato.fechaCierre(),
+    ]);
+  } catch (err) {
+    // Hay codigo, pero no responde como un contrato Votacion.
+    const code = (err as { code?: string }).code;
+    if (code === 'CALL_EXCEPTION' || code === 'BAD_DATA') {
+      return `el contrato en ${address} no es un contrato de votacion`;
+    }
+    throw err;
+  }
+
+  if (!esWalletDelBackend(backend)) {
+    return `el contrato en ${address} autoriza a ${backend}, no a la wallet de este sistema`;
+  }
+  if (
+    nombre !== esperado.nombre ||
+    Number(apertura) !== esperado.fechaAperturaUnix ||
+    Number(cierre) !== esperado.fechaCierreUnix
+  ) {
+    return `el contrato en ${address} es de otra eleccion ("${nombre}", ${apertura} a ${cierre})`;
+  }
+  return null;
+}
+
 /** Lee el conteo de votos por lista directamente del contrato. */
 export async function obtenerVotos(contratoAddress: string): Promise<number[]> {
   const contrato = contratoLectura(contratoAddress);

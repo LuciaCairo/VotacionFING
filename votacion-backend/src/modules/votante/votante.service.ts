@@ -7,11 +7,13 @@ import {
   InternoError,
   NoEncontradoError,
   ProhibidoError,
+  ServicioNoDisponibleError,
   ValidacionError,
 } from '../../utils/errors.js';
 import {
   generarHashVoto,
   registrarVoto,
+  verificarContratoDeEleccion,
   yaVotoEnContrato,
 } from '../../services/blockchain.service.js';
 import { registrarLog } from '../../services/log.service.js';
@@ -367,6 +369,8 @@ async function confirmarParticipacion(id: number): Promise<Date> {
  *   2. Votante está en el padrón y está activo.
  *   3. Votante no votó ya en esta elección (PARTICIPACION).
  *   4. indice_lista es válido para la elección.
+ *   5. La address guardada es el contrato de esta elección (ver
+ *      verificarContratoDeEleccion): si no, no se toca ni la BD ni BFA.
  *
  * Lógica de emisión (anonimato del voto):
  *   - Reserva PARTICIPACION con un hash aleatorio (ver reservarParticipacion).
@@ -440,12 +444,47 @@ export async function emitirVoto(
     throw new ProhibidoError('No estás habilitado para votar en esta elección.');
   }
 
-  // ── 4. Reservar la participación ─────────────────────────────
+  // ── 4. El contrato es el de esta elección ────────────────────
+  // Antes de escribir nada: si la address de la BD no apunta al contrato de
+  // esta elección, el voto no se contaría (address sin código) o se contaría
+  // en otra elección. Sin conexión con BFA tampoco se reserva nada: no hay
+  // ningún envío en duda que reconciliar después.
+  let motivoContrato: string | null;
+  try {
+    motivoContrato = await verificarContratoDeEleccion(eleccion.contratoAddress, {
+      nombre: eleccion.nombre,
+      fechaAperturaUnix: Math.floor(eleccion.fechaInicio.getTime() / 1000),
+      fechaCierreUnix: Math.floor(eleccion.fechaCierre.getTime() / 1000),
+    });
+  } catch (err) {
+    logger.error({ err, eleccionId }, 'BFA: no se pudo verificar el contrato antes de votar');
+    throw new ServicioNoDisponibleError(
+      'No se pudo conectar a la blockchain (BFA). Tu voto no fue registrado: intentá nuevamente en unos minutos.',
+    );
+  }
+  if (motivoContrato) {
+    logger.error(
+      { eleccionId, motivo: motivoContrato },
+      'El contrato de la elección no coincide: voto rechazado (CRÍTICO: revisar contrato_address)',
+    );
+    void registrarLog({
+      tipoEvento: 'voto_error',
+      rolUsuario: 'votante',
+      idUsuario: votanteId,
+      descripcion: `Voto rechazado en elección ${eleccionId}: ${motivoContrato}. No se envió nada a BFA.`,
+      ip,
+    });
+    throw new InternoError(
+      'Error de configuración del sistema de votación: tu voto no fue registrado. Avisá a la administración.',
+    );
+  }
+
+  // ── 5. Reservar la participación ─────────────────────────────
   // Corta con 409 si ya votó; si no, frena el doble voto antes de tocar BFA
   // (ver reservarParticipacion).
   const reserva = await reservarParticipacion(votanteId, eleccionId);
 
-  // ── 5. Emitir voto en BFA ────────────────────────────────────
+  // ── 6. Emitir voto en BFA ────────────────────────────────────
   try {
     await registrarVoto({
       contratoAddress: eleccion.contratoAddress,
@@ -518,7 +557,7 @@ export async function emitirVoto(
     logger.warn({ eleccionId }, 'BFA: el voto entró pese al error al esperar la confirmación');
   }
 
-  // ── 6. Confirmar la participación ────────────────────────────
+  // ── 7. Confirmar la participación ────────────────────────────
   let fechaVoto: Date;
   try {
     if (env.devForzarErrorConfirmacion) {
@@ -545,7 +584,7 @@ export async function emitirVoto(
     );
   }
 
-  // ── 7. Log de auditoría ──────────────────────────────────────
+  // ── 8. Log de auditoría ──────────────────────────────────────
   // Solo registra que hubo un voto en la elección; nunca la lista elegida.
   void registrarLog({
     tipoEvento: 'voto_emitido',
