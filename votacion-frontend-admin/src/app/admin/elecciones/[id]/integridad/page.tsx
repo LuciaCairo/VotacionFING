@@ -286,7 +286,11 @@ function SeccionCard({
             </p>
           ) : (
             seccion.checks.map((chk) => (
-              <ChequeoRow key={chk.campo} chk={chk} />
+              <ChequeoRow
+                key={chk.campo}
+                chk={chk}
+                resultado={resultadoDeCheck(chk, seccion.estado)}
+              />
             ))
           )}
         </div>
@@ -298,20 +302,58 @@ function SeccionCard({
 /** Texto exacto de admin.service.ts (construirSeccionEleccion) para el check de dirección del contrato. */
 const CAMPO_CONTRATO = "Contrato desplegado (código presente en la address)";
 
-function IconoResultado({ ok }: { ok: boolean }) {
+type ResultadoCheck = "ok" | "advertencia" | "discrepancia";
+
+/**
+ * Un check interno (estado vs. fechas, reservas sin confirmar) no compara
+ * contra BFA: si falla en una sección con advertencias, es una advertencia,
+ * no una discrepancia con la blockchain.
+ */
+function resultadoDeCheck(
+  chk: IntegridadCheckDTO,
+  estadoSeccion: IntegridadSeccionDTO["estado"],
+): ResultadoCheck {
+  if (chk.ok) return "ok";
+  return chk.interno && estadoSeccion === "con_advertencias"
+    ? "advertencia"
+    : "discrepancia";
+}
+
+const RESULTADO_LABEL: Record<ResultadoCheck, string> = {
+  ok: "Verificado",
+  advertencia: "Advertencia",
+  discrepancia: "Discrepancia",
+};
+
+/** Fondo y texto de la celda del valor según el resultado (mismos colores que ESTADO_SECCION_META). */
+const CELDA_RESULTADO: Record<ResultadoCheck, string> = {
+  ok: "bg-[#f4f6f8] text-[#0a2540]",
+  advertencia: "bg-[#fff4e5] text-[#c9821a]",
+  discrepancia: "bg-[#fdecec] text-[#c23b3b]",
+};
+
+function IconoResultado({ resultado }: { resultado: ResultadoCheck }) {
   return (
     <div className="flex justify-center">
-      {ok ? (
+      {resultado === "ok" ? (
         <Check className="size-4 text-[#1e9e5c]" aria-hidden="true" />
+      ) : resultado === "advertencia" ? (
+        <TriangleAlert className="size-4 text-[#c9821a]" aria-hidden="true" />
       ) : (
         <X className="size-4 text-[#c23b3b]" aria-hidden="true" />
       )}
-      <span className="sr-only">{ok ? "Verificado" : "Discrepancia"}</span>
+      <span className="sr-only">{RESULTADO_LABEL[resultado]}</span>
     </div>
   );
 }
 
-function ChequeoRow({ chk }: { chk: IntegridadCheckDTO }) {
+function ChequeoRow({
+  chk,
+  resultado,
+}: {
+  chk: IntegridadCheckDTO;
+  resultado: ResultadoCheck;
+}) {
   const esContrato = chk.campo === CAMPO_CONTRATO;
   // El check de consistencia interna (estado vs. fechas) nunca manda bfa
   // (no compara contra la blockchain, ver IntegridadCheck.interno en el
@@ -329,17 +371,13 @@ function ChequeoRow({ chk }: { chk: IntegridadCheckDTO }) {
           <CeldaContrato valor={chk.bd} ok={chk.ok} />
         ) : (
           <div
-            className={`truncate rounded-[6px] px-2.5 py-1.5 font-mono text-[12px] ${
-              chk.ok
-                ? "bg-[#f4f6f8] text-[#0a2540]"
-                : "bg-[#fdecec] text-[#c23b3b]"
-            }`}
+            className={`truncate rounded-[6px] px-2.5 py-1.5 font-mono text-[12px] ${CELDA_RESULTADO[resultado]}`}
             title={formatValorIntegridad(chk.bd)}
           >
             {formatValorIntegridad(chk.bd)}
           </div>
         )}
-        <IconoResultado ok={chk.ok} />
+        <IconoResultado resultado={resultado} />
       </div>
     );
   }
@@ -359,14 +397,12 @@ function ChequeoRow({ chk }: { chk: IntegridadCheckDTO }) {
         {bd}
       </div>
       <div
-        className={`truncate rounded-[6px] px-2.5 py-1.5 font-mono text-[12px] ${
-          chk.ok ? "bg-[#f4f6f8] text-[#0a2540]" : "bg-[#fdecec] text-[#c23b3b]"
-        }`}
+        className={`truncate rounded-[6px] px-2.5 py-1.5 font-mono text-[12px] ${CELDA_RESULTADO[resultado]}`}
         title={bfa}
       >
         {bfa}
       </div>
-      <IconoResultado ok={chk.ok} />
+      <IconoResultado resultado={resultado} />
     </div>
   );
 }
