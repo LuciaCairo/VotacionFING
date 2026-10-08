@@ -7,7 +7,7 @@ import { useDetalleEleccion } from "@/hooks/use-detalle-eleccion";
 import { useComprobante } from "@/hooks/use-comprobante";
 import { useVotar } from "@/hooks/use-votar";
 import type { EleccionDetalleDTO, VotarResponse } from "@/lib/api/elecciones";
-import { ApiError } from "@/lib/api/errors";
+import { ApiError, type NetworkError } from "@/lib/api/errors";
 import { clearVotanteSession } from "@/lib/auth/session";
 import { formatFechaHora } from "@/lib/format";
 import { BoletaListaOption } from "@/components/votante/boleta-lista-option";
@@ -103,6 +103,7 @@ function BoletaFlow({ eleccion }: { eleccion: EleccionDetalleDTO }) {
   if (votar.isError) {
     return (
       <VotoErrorView
+        titulo={tituloErrorVoto(votar.error)}
         mensaje={votar.error.message}
         onVolver={() => {
           setDialogOpen(false);
@@ -217,11 +218,34 @@ function VotoExitosoView({
   );
 }
 
+/**
+ * Título de la pantalla de error del voto según el caso. El backend no manda
+ * un código de error, solo el status y el mensaje (ver emitirVoto en
+ * votacion-backend/src/modules/votante/votante.service.ts), así que estos dos
+ * casos se reconocen por el comienzo de su mensaje:
+ *   - 500 "Tu voto quedó registrado en la blockchain, pero…": el voto SÍ
+ *     entró a BFA; solo falló guardar la constancia.
+ *   - 409 "Ya emitiste tu voto…": el votante ya había votado.
+ */
+function tituloErrorVoto(error: ApiError | NetworkError): string {
+  if (error instanceof ApiError) {
+    if (error.status === 500 && error.message.startsWith("Tu voto quedó registrado")) {
+      return "Tu voto quedó registrado";
+    }
+    if (error.status === 409 && error.message.startsWith("Ya emitiste tu voto")) {
+      return "Ya votaste en esta elección";
+    }
+  }
+  return "No pudimos registrar tu voto";
+}
+
 function VotoErrorView({
+  titulo,
   mensaje,
   onVolver,
   onSoporte,
 }: {
+  titulo: string;
   mensaje: string;
   onVolver: () => void;
   onSoporte: () => void;
@@ -232,9 +256,7 @@ function VotoErrorView({
         <AlertTriangle className="size-7 text-[#c0392b]" aria-hidden="true" />
       </div>
       <div>
-        <div className="text-lg font-extrabold text-[#0a2540]">
-          No pudimos registrar tu voto
-        </div>
+        <div className="text-lg font-extrabold text-[#0a2540]">{titulo}</div>
         <div className="mt-1 max-w-[380px] text-[13.5px] leading-[1.45] text-[#5b6b7c]">
           {mensaje}
         </div>
