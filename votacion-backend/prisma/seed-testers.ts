@@ -8,8 +8,8 @@ const prisma = new PrismaClient();
 
 /**
  * Cuentas para la prueba remota con usuarios (evaluacion de usabilidad).
- *   - 8 votantes (legajos 90001..90008)
- *   - 2 administradores
+ *   - 33 votantes (legajos 90001..90033): 30 para repartir y 3 de reserva
+ *   - 2 administradores: uno para quien conduce la prueba y otro de reserva
  *
  * A diferencia de seed.ts, cada cuenta tiene una contrasena aleatoria propia:
  * la app queda expuesta por un tunel publico, asi que una contrasena comun
@@ -19,7 +19,7 @@ const prisma = new PrismaClient();
  * credenciales-testers.csv (ignorado por git). Uso:
  *   npm run seed:testers
  */
-const CANT_VOTANTES = 8;
+const CANT_VOTANTES = 33;
 const CANT_ADMINS = 2;
 
 // Sin caracteres ambiguos (0/O, 1/l/I) para que se puedan dictar o copiar a mano.
