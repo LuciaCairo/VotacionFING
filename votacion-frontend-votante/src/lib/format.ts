@@ -7,6 +7,17 @@ export function formatFechaCorta(iso: string): string {
   return `${dd}/${mm}/${yyyy}`;
 }
 
+/**
+ * DD/MM/AAAA a partir de un día 'AAAA-MM-DD' sin hora, como la fecha_voto de
+ * la constancia (ver ComprobanteDTO). Se arma partiendo el texto: con
+ * new Date('AAAA-MM-DD') se interpreta como medianoche UTC y en Argentina
+ * mostraría el día anterior.
+ */
+export function formatDia(dia: string): string {
+  const [yyyy, mm, dd] = dia.split("-");
+  return `${dd}/${mm}/${yyyy}`;
+}
+
 /** DD/MM/AAAA · HH:mm a partir de un ISO string. */
 export function formatFechaHora(iso: string): string {
   const fecha = new Date(iso);

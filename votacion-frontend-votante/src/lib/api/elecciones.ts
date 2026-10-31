@@ -176,7 +176,8 @@ export function obtenerDetalleEleccionRequest(
  * votacion-backend/src/modules/votante/votante.service.ts, obtenerComprobante).
  * Constancia de participación: solo elección y fecha. A propósito no trae
  * ningún hash — con el hash se encuentra la transacción en BFA, que lleva la
- * lista elegida en claro.
+ * lista elegida en claro. Por lo mismo, fecha_voto es solo el día
+ * ('AAAA-MM-DD', hora de Mendoza), sin hora: mostrarlo con formatDia.
  */
 export interface ComprobanteDTO {
   eleccion: string;

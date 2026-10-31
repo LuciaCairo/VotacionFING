@@ -23,6 +23,7 @@ import {
   ConflictoError,
   ServicioNoDisponibleError,
 } from '../../utils/errors.js';
+import { formatFechaLocal } from '../../utils/fecha.js';
 import type { JwtPayload } from '../../types/auth.js';
 import type { CrearEleccionInput } from './admin.schemas.js';
 
@@ -235,29 +236,6 @@ export async function descargarPadronCsv(): Promise<string> {
 }
 
 // ─── GET /api/admin/elecciones/:id/participacion/descargar ──
-
-const ZONA_HORARIA_LOCAL = 'America/Argentina/Mendoza';
-
-/**
- * Formatea una fecha en hora local de Mendoza (UTC-3, sin horario de verano)
- * como 'YYYY-MM-DD', sin hora. Todo el resto de la app manda fechas como ISO
- * UTC y deja que el frontend las convierta a hora local para mostrarlas (ver
- * `formatFechaHora` en ambos frontends) — acá no hay frontend de por medio
- * (el CSV se abre directo en Excel), así que la conversión hay que hacerla
- * server-side explícitamente contra la zona horaria de la institución, en vez
- * de asumir que el proceso de Node corre en esa misma zona horaria (el día
- * puede cambiar según la zona).
- */
-function formatFechaLocal(fecha: Date): string {
-  const partes = new Intl.DateTimeFormat('en-CA', {
-    timeZone: ZONA_HORARIA_LOCAL,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(fecha);
-  const obtener = (tipo: string) => partes.find((p) => p.type === tipo)?.value ?? '';
-  return `${obtener('year')}-${obtener('month')}-${obtener('day')}`;
-}
 
 /**
  * Genera un CSV RFC 4180 (BOM UTF-8) con el padrón cruzado contra quién votó

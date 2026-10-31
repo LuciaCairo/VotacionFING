@@ -111,7 +111,9 @@ redirige a `/login`.
   nunca la lista elegida, ni siquiera al propio votante, para preservar el
   anonimato. Tampoco muestra el hash de la transacción en BFA: la transacción
   lleva la lista en claro, así que con ese hash el votante podría demostrarle
-  a otro a quién votó.
+  a otro a quién votó. Por lo mismo, la fecha va solo con el día, sin hora:
+  con pocos votos por minuto, la hora alcanza para encontrar la transacción
+  por la hora del bloque.
 - El voto en blanco se muestra como una opción más de la boleta (no aparte).
 - La emisión de voto (`POST /elecciones/:id/votar`) espera confirmación real
   de la transacción en BFA, así que usa un timeout más largo (60s) que el

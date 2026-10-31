@@ -10,6 +10,7 @@ import {
   ServicioNoDisponibleError,
   ValidacionError,
 } from '../../utils/errors.js';
+import { formatFechaLocal } from '../../utils/fecha.js';
 import {
   generarHashVoto,
   registrarVoto,
@@ -193,11 +194,13 @@ export async function obtenerEleccionesFinalizadas() {
 /**
  * Devuelve la constancia de participación del votante en la elección (HU-07).
  *
- * Es solo eso: elección y fecha. A propósito no incluye el tx hash ni el
- * hash del voto — cualquier dato que permita encontrar la transacción en BFA
- * permite leer la lista elegida (va en claro en la transacción), y con eso el
- * votante podría demostrarle a un tercero a quién votó (venta o coacción del
- * voto).
+ * Es solo eso: elección y día del voto. A propósito no incluye el tx hash ni
+ * el hash del voto — cualquier dato que permita encontrar la transacción en
+ * BFA permite leer la lista elegida (va en claro en la transacción), y con eso
+ * el votante podría demostrarle a un tercero a quién votó (venta o coacción
+ * del voto). Por el mismo motivo la fecha va sin hora (ver formatFechaLocal):
+ * con pocos votos por minuto, la hora del voto alcanza para encontrar su
+ * transacción por la hora del bloque.
  */
 export async function obtenerComprobante(eleccionId: number, votanteId: number) {
   const participacion = await prisma.participacion.findUnique({
@@ -217,7 +220,7 @@ export async function obtenerComprobante(eleccionId: number, votanteId: number) 
 
   return {
     eleccion: participacion.eleccion.nombre,
-    fecha_voto: participacion.fechaVoto.toISOString(),
+    fecha_voto: formatFechaLocal(participacion.fechaVoto),
   };
 }
 
@@ -594,10 +597,11 @@ export async function emitirVoto(
     ip,
   });
 
-  // Constancia de participación: lo mismo que devuelve GET .../comprobante.
+  // Constancia de participación: lo mismo que devuelve GET .../comprobante
+  // (solo el día, sin hora).
   return {
     mensaje: 'Voto registrado correctamente',
     eleccion: eleccion.nombre,
-    fecha_voto: fechaVoto.toISOString(),
+    fecha_voto: formatFechaLocal(fechaVoto),
   };
 }

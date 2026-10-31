@@ -152,7 +152,10 @@ prisma/
     permisos para quitar el trigger. `TRUNCATE` (lo que usa `prisma/limpiar.ts`)
     no lo dispara.
   - El votante recibe una **constancia de participación** (elección y fecha), no el
-    tx hash: con él podría demostrarle a otro a quién votó.
+    tx hash: con él podría demostrarle a otro a quién votó. La fecha va solo con
+    el día, sin hora, igual que en el CSV de participación: con pocos votos por
+    minuto, la hora del voto alcanza para encontrar su transacción por la hora
+    del bloque.
   - La auditoría de integridad compara la **cantidad** de participaciones contra el
     total de votos del contrato, en vez de verificar votante por votante.
   - Limitación que queda: la hora de cada voto (`fecha_voto`, tabla `LOG`) se
