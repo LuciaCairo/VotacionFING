@@ -46,8 +46,8 @@ y [`../votacion-frontend-votante/README.md`](../votacion-frontend-votante/README
 - Node.js 20 LTS
 - Una base PostgreSQL (Neon.tech) y un Redis (Upstash) — o locales.
 - La cuenta BFA del backend (`0x9e63...`) y su clave privada.
-- El **bytecode** del contrato `Votacion.sol` compilado con Solidity **0.5.4** + EVM
-  **byzantium** (ver más abajo).
+- El **bytecode** del contrato [`src/contracts/Votacion.sol`](src/contracts/Votacion.sol)
+  compilado con Solidity **0.5.4** + EVM **byzantium** (ver más abajo).
 
 ---
 
@@ -108,12 +108,12 @@ elecciones falla de forma controlada con un mensaje claro.
 ```
 src/
   config/        env (Zod), logger (Pino), prisma, redis
-  contracts/     ABI y bytecode del contrato Votacion.sol
+  contracts/     código fuente (Votacion.sol), ABI y bytecode del contrato
   plugins/       auth (JWT + lista negra + roles), manejo de errores
   services/      blockchain (ethers/BFA), log (tabla LOG)
   modules/
     auth/        login votante/admin, logout
-    votante/     elecciones vigentes/finalizadas, detalle, votar, comprobante
+    votante/     elecciones vigentes/finalizadas, detalle, votar, constancia de participación
     admin/       CRUD elecciones, integridad, padrón, saldo blockchain
     eleccion/    endpoint compartido de resultados (no lleva prefijo /admin ni /votante)
   jobs/          cron de apertura/cierre automático de elecciones
@@ -193,14 +193,14 @@ prisma/
   a v10, `fastify` a v5 (con el resto del ecosistema — cors, helmet, rate-limit,
   fastify-plugin, pino — alineado a esa major) y `node-cron` a v4. Detalle completo
   del proceso y de los 3 archivos que hubo que ajustar por el cambio de API de
-  Fastify v5 en [`../docs/informe-backend-npm-audit.html`](../docs/informe-backend-npm-audit.html).
+  Fastify v5 en [`../docs/informe-backend-npm-audit.pdf`](../docs/informe-backend-npm-audit.pdf).
 - **Concurrencia en `blockchain.service.ts`**: hay una única wallet (`signer`) que
   firma todas las transacciones del sistema (votos y deploys por igual). Los envíos
   se serializan y el nonce se cuenta en memoria en vez de volver a preguntarle a la
   red en cada transacción — preguntarle a BFA en cada envío no alcanza (es una red
   de consorcio, con más de un nodo detrás de un balanceador, y un nodo puede no
   estar al día con lo que otro acaba de aceptar). Verificado con votos concurrentes
-  reales contra BFA; ver [`../docs/informe-nonce-blockchain.html`](../docs/informe-nonce-blockchain.html)
+  reales contra BFA; ver [`../docs/informe-nonce-blockchain.pdf`](../docs/informe-nonce-blockchain.pdf)
   para la bitácora completa (incluye un primer intento que parecía andar y falló
   igual bajo más carga). Limitación conocida: esto serializa dentro de un único
   proceso de Node — correr el backend en más de una instancia a la vez
@@ -213,4 +213,4 @@ prisma/
   blockchain permisionada); un admin puede vaciar el saldo de gas creando
   elecciones sin límite, y un votante puede spamear intentos de voto propios
   mientras el primero no confirma. Detalle de cada uno en
-  [`../docs/informe-nonce-blockchain.html`](../docs/informe-nonce-blockchain.html).
+  [`../docs/informe-nonce-blockchain.pdf`](../docs/informe-nonce-blockchain.pdf).

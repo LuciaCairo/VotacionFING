@@ -13,8 +13,6 @@ contract Votacion {
     string[] public listas;
 
 
-    // ANTES: mapping(uint => uint) public votosPorLista;
-    // CAMBIO: se saca el "public" para que no se genere un getter automático sin control.
     mapping(uint    => uint) private votosPorLista;
     mapping(bytes32 => bool) public yaVoto;
 
@@ -51,7 +49,6 @@ contract Votacion {
     }
 
 
-    // NUEVO: modifier que solo deja pasar si la elección ya cerró.
     modifier eleccionFinalizada() {
         require(block.timestamp > fechaCierre, "Los resultados solo estan disponibles al finalizar la eleccion");
         _;
@@ -79,7 +76,6 @@ contract Votacion {
     }
 
 
-    // CAMBIO: se agrega el modifier eleccionFinalizada.
     function obtenerTodosLosVotos() public view eleccionFinalizada returns (uint[] memory) {
         uint[] memory resultado = new uint[](listas.length);
         for (uint i = 0; i < listas.length; i++) {
