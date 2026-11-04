@@ -59,6 +59,17 @@ Se corrió `npm audit` en las tres apps (llevándolas a 0 vulnerabilidades repor
 
 Limitaciones de seguridad conocidas, con decisión explícita de documentar (no mitigar) por estar fuera del alcance de esta tesina — detalle en el último informe de arriba: voto fantasma por firmante único, roles de base de datos sin mínimo privilegio, confianza en el nodo RPC de BFA, y DoS económico por creación de elecciones (admin) o votos repetidos (votante) sin límite.
 
+## Pruebas
+
+Las planillas de casos de prueba están en [`docs/pruebas/`](docs/pruebas/):
+
+- [`pruebas-api.xlsx`](docs/pruebas/pruebas-api.xlsx) — casos de prueba de la API, por endpoint.
+- [`pruebas-panel-administracion.xlsx`](docs/pruebas/pruebas-panel-administracion.xlsx) — casos de prueba del panel de administración, por pantalla.
+- [`pruebas-aplicacion-votante.xlsx`](docs/pruebas/pruebas-aplicacion-votante.xlsx) — casos de prueba de la app del votante, por pantalla.
+- [`pruebas-integridad-registro.xlsx`](docs/pruebas/pruebas-integridad-registro.xlsx) — pruebas de integridad del registro: comparan la base de datos con lo que registra la BFA, incluso con datos alterados a propósito.
+
+No se incluyen los casos de funciones que el sistema ya no tiene ni los que no llegaron a ejecutarse.
+
 ## Puesta en marcha rápida
 
 ```bash
